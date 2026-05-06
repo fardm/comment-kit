@@ -3,6 +3,8 @@
  * Embeddable comment system for static sites
  */
 
+
+
 class CommentSystem {
     constructor(options) {
         this.apiUrl = options.apiUrl || '/comments/api.php';
@@ -75,9 +77,9 @@ class CommentSystem {
 
     renderPostReactionsSection(counts = {}) {
         const reactions = [
-            { type: 'heart',     emoji: '♥',  label: 'Love it' },
+            { type: 'heart',     emoji: '❤️',  label: 'Love it' },
             { type: 'thumbsup',  emoji: '👍', label: 'Good point' },
-            { type: 'lightbulb', emoji: '💡', label: 'Interesting' },
+            { type: 'lightbulb', emoji: '👎', label: 'Dislike' },
             { type: 'funny',     emoji: '😄', label: 'Funny' },
         ];
         const buttonsHtml = reactions.map(r => {
@@ -92,7 +94,7 @@ class CommentSystem {
         }).join('');
         return `
             <div class="post-reactions-section">
-                <span class="post-reactions-label">React to this post:</span>
+                <span class="post-reactions-label"></span>
                 <div class="reactions-bar">${buttonsHtml}</div>
             </div>
         `;
@@ -162,6 +164,7 @@ class CommentSystem {
         await this.loadComments();
     }
 
+    // رندر
     render() {
         const formHtml = this.closed
             ? '<p class="comments-closed">Comments are closed.</p>'
@@ -169,11 +172,14 @@ class CommentSystem {
 
         this.container.innerHTML = `
             <div class="comments-system">
-                <div id="post-reactions-container">
-                    ${this.renderPostReactionsSection()}
+                <div class="post-comment">
+                    <div id="post-reactions-container">
+                        ${this.renderPostReactionsSection()}
+                    </div>
+                    <h3 class="comments-title"></h3>
+                    <p class="befor-form-comment">نظرتان را بنویسید. نشانی ایمیل شما منتشر نخواهد شد.</p>
+                    ${formHtml}
                 </div>
-                <h3 class="comments-title">Comments</h3>
-                ${formHtml}
                 <div id="comments-list" class="comments-list">
                     <p class="loading">Loading comments...</p>
                 </div>
@@ -186,7 +192,7 @@ class CommentSystem {
     }
 
     renderCommentForm(parentId = null, parentAuthor = null) {
-        const replyText = parentAuthor ? `Reply to ${this.escapeHtml(parentAuthor)}` : 'Leave a Comment';
+        const replyText = parentAuthor ? `پاسخ به ${this.escapeHtml(parentAuthor)}` : '';
         const formId = parentId ? `reply-form-${parentId}` : 'main-comment-form';
 
         // Get saved user info from localStorage
@@ -196,35 +202,32 @@ class CommentSystem {
             <form class="comment-form" id="${formId}" data-parent-id="${parentId || ''}">
                 <h4>${replyText}</h4>
                 <div class="form-group">
-                    <input type="text" name="author_name" placeholder="Name *" required class="form-input" value="${this.escapeHtml(savedInfo.name)}">
+                    <input type="text" name="author_name" placeholder="نام *" required class="form-input" value="${this.escapeHtml(savedInfo.name)}">
                 </div>
                 <div class="form-group">
-                    <input type="email" name="author_email" placeholder="Email *" required class="form-input" value="${this.escapeHtml(savedInfo.email)}">
+                    <input type="email" name="author_email" placeholder="ایمیل *" required class="form-input" value="${this.escapeHtml(savedInfo.email)}">
                 </div>
                 <div class="form-group">
-                    <input type="url" name="author_url" placeholder="Website (optional)" class="form-input" value="${this.escapeHtml(savedInfo.url)}">
-                </div>
-                <div class="form-group" style="position: absolute; left: -9999px;">
-                    <input type="text" name="website" placeholder="Website" class="form-input" tabindex="-1" autocomplete="off">
+                    <input type="url" name="author_url" placeholder="وب سایت" class="form-input" value="${this.escapeHtml(savedInfo.url)}">
                 </div>
                 <div class="form-group">
-                    <textarea name="content" placeholder="Your comment *" required class="form-textarea" rows="4"></textarea>
+                    <textarea name="content" placeholder="کامنت شما *" required class="form-textarea" rows="4"></textarea>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" name="subscribe" value="1" checked>
-                        <span>Notify me of follow-up comments on this page</span>
+                        <span>نظرات بعدی در این صفحه را به من اطلاع بده</span>
                     </label>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" name="remember_me" value="1" ${savedInfo.remember ? 'checked' : ''}>
-                        <span>Remember my name, email, and website for next time</span>
+                        <span>مشخصات من را برای دفعه‌ی بعد به یاد داشته باش</span>
                     </label>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn-submit">Post Comment</button>
-                    ${parentId ? '<button type="button" class="btn-cancel" onclick="this.closest(\'.comment-reply-form\').remove()">Cancel</button>' : ''}
+                    <button type="submit" class="btn-submit">ارسال</button>
+                    ${parentId ? '<button type="button" class="btn-cancel" onclick="this.closest(\'.comment-reply-form\').remove()">لغو</button>' : ''}
                 </div>
                 <div class="form-message"></div>
             </form>
@@ -297,11 +300,11 @@ class CommentSystem {
                     messageEl.textContent = '';
                 }, 2000);
             } else {
-                messageEl.textContent = result.error || 'Failed to post comment';
+                messageEl.textContent = result.error || 'ارسال نشد';
                 messageEl.className = 'form-message error';
             }
         } catch (error) {
-            messageEl.textContent = 'Network error. Please try again.';
+            messageEl.textContent = 'خطای شبکه. لطفاً دوباره تلاش کنید.';
             messageEl.className = 'form-message error';
         } finally {
             submitBtn.disabled = false;
@@ -335,34 +338,45 @@ class CommentSystem {
         if (comments.length === 0) {
             listEl.innerHTML = this.closed
                 ? '<p class="no-comments">No comments.</p>'
-                : '<p class="no-comments">No comments yet. Be the first to comment!</p>';
+                : '<p class="no-comments">هنوز کامنتی ثبت نشده!</p>';
             return;
         }
 
         listEl.innerHTML = comments.map(comment => this.renderComment(comment)).join('');
     }
 
+    formatJalaliDate(dateString) {
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            return new Intl.DateTimeFormat('fa-IR', {
+                calendar: 'persian',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Tehran'
+            }).format(date);
+        } catch (e) {
+            return dateString;
+        }
+    }
+
     renderComment(comment, depth = 0) {
-        const date = new Date(comment.created_at);
-        const formattedDate = date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const formattedDate = this.formatJalaliDate(comment.created_at);
 
         const authorLink = comment.author_url
             ? `<a href="${this.escapeHtml(comment.author_url)}" target="_blank" rel="nofollow noopener">${this.escapeHtml(comment.author_name)}</a>`
             : this.escapeHtml(comment.author_name);
 
         const isPending = comment.status === 'pending';
-        const pendingBadge = isPending ? '<span class="badge-pending">Pending Moderation</span>' : '';
+        const pendingBadge = isPending ? '<span class="badge-pending">در انتظار بررسی</span>' : '';
 
         const reactions = [
-            { type: 'heart',     emoji: '♥',  label: 'Love it' },
+            { type: 'heart',     emoji: '❤️',  label: 'Love it' },
             { type: 'thumbsup',  emoji: '👍', label: 'Good point' },
-            { type: 'lightbulb', emoji: '💡', label: 'Interesting' },
+            { type: 'lightbulb', emoji: '👎', label: 'Dislike' },
             { type: 'funny',     emoji: '😄', label: 'Funny' },
         ];
         const reactionsHtml = reactions.map(r => {
@@ -378,7 +392,7 @@ class CommentSystem {
         const upvoteBtn = isPending ? '' : `<div class="reactions-bar">${reactionsHtml}</div>`;
 
         let html = `
-            <div class="comment ${isPending ? 'comment-pending' : ''}" id="comment-${comment.id}" style="margin-left: ${depth * 40}px">
+            <div class="comment ${isPending ? 'comment-pending' : ''}" id="comment-${comment.id}" style="margin-right: ${depth * 30}px">
                 <div class="comment-meta">
                     <span class="comment-author">${authorLink}</span>
                     <span class="comment-date">${formattedDate}</span>
@@ -389,7 +403,7 @@ class CommentSystem {
                 </div>
                 <div class="comment-actions">
                     ${upvoteBtn}
-                    ${this.closed ? '' : `<button class="btn-reply" onclick="commentsWidget.showReplyForm(${comment.id}, '${this.escapeHtml(comment.author_name).replace(/'/g, "\\'")}')">Reply</button>`}
+                    ${this.closed ? '' : `<button class="btn-reply" onclick="commentsWidget.showReplyForm(${comment.id}, '${this.escapeHtml(comment.author_name).replace(/'/g, "\\'")}')">پاسخ</button>`}
                 </div>
                 <div id="reply-form-container-${comment.id}"></div>
             </div>
