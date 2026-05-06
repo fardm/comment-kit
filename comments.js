@@ -215,7 +215,7 @@ class CommentSystem {
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
-                        <input type="checkbox" name="subscribe" value="1" checked>
+                        <input type="checkbox" name="subscribe" value="1">
                         <span>نظرات بعدی در این صفحه را به من اطلاع بده</span>
                     </label>
                 </div>
