@@ -12,6 +12,8 @@ class CommentSystem {
         this.containerId = options.containerId || 'comments-container';
         this.closed = options.closed || false;
         this.container = document.getElementById(this.containerId);
+        this._outsideClickHandlerBound = false;
+        this._setupOutsideClickHandler();
 
         if (!this.container) {
             console.error('Comment container not found');
@@ -19,6 +21,57 @@ class CommentSystem {
         }
 
         this.init();
+    }
+
+    _setupOutsideClickHandler() {
+        if (this._outsideClickHandlerBound) return;
+        this._outsideClickHandlerBound = true;
+
+        document.addEventListener('click', (e) => {
+            if (!this.container) return;
+            const openWrap = this.container.querySelector('.reaction-picker-wrap.open');
+            if (!openWrap) return;
+            if (e.target && openWrap.contains(e.target)) return;
+            this.closeAllReactionPickers();
+        });
+    }
+
+    closeAllReactionPickers() {
+        if (!this.container) return;
+        this.container.querySelectorAll('.reaction-picker-wrap.open').forEach(el => {
+            el.classList.remove('open');
+        });
+    }
+
+    getReactionDefinitions() {
+        // Keep reaction_type stable for persistence (DB stores reaction_type).
+        // This order matches the requested emoji list:
+        // 👍 👎 🙏 👌 🔥 ❤️ ☹️ 😡 😄 😐
+        return [
+            { type: 'thumbsup',  emoji: '👍', label: 'Good point' },
+            { type: 'lightbulb', emoji: '👎', label: 'Dislike' },
+            { type: 'pray',      emoji: '🙏', label: 'Thanks' },
+            { type: 'ok',        emoji: '👌', label: 'Okay' },
+            { type: 'fire',      emoji: '🔥', label: 'Love it' },
+            { type: 'heart',     emoji: '❤️', label: 'Love it' },
+            { type: 'frown',     emoji: '☹️', label: 'Not great' },
+            { type: 'rage',      emoji: '😡', label: 'Angry' },
+            { type: 'funny',     emoji: '😄', label: 'Funny' },
+            { type: 'neutral',   emoji: '😐', label: 'Neutral' },
+        ];
+    }
+
+    getCommentReactionCounts(comment) {
+        // New backend returns `votes_by_reaction_type`, old one exposes only 4 fields.
+        if (comment && comment.votes_by_reaction_type && typeof comment.votes_by_reaction_type === 'object') {
+            return comment.votes_by_reaction_type;
+        }
+        return {
+            heart: comment.votes_heart || 0,
+            thumbsup: comment.votes_thumbsup || 0,
+            lightbulb: comment.votes_lightbulb || 0,
+            funny: comment.votes_funny || 0,
+        };
     }
 
     getPostReactions() {
@@ -41,10 +94,11 @@ class CommentSystem {
     }
 
     async handlePostReaction(reactionType) {
-        const btn = document.querySelector(`.btn-post-reaction[data-reaction="${reactionType}"]`);
-        if (!btn || btn.disabled) return;
+        // Optimistic-close picker UX (real update is still async).
+        this.closeAllReactionPickers();
 
-        btn.disabled = true;
+        const toggleEls = document.querySelectorAll(`.reaction-picker-emoji[data-reaction-target="post"][data-reaction="${reactionType}"], .btn-reaction.btn-post-reaction[data-reaction="${reactionType}"]`);
+        toggleEls.forEach(el => el.disabled = true);
         try {
             const response = await fetch(`${this.apiUrl}?action=post_reaction`, {
                 method: 'POST',
@@ -64,38 +118,60 @@ class CommentSystem {
                 }
                 this.setPostReactions(data);
 
-                btn.classList.toggle('voted', result.voted);
-                const countEl = btn.querySelector('.reaction-count');
-                if (countEl) countEl.textContent = result.counts[reactionType] > 0 ? result.counts[reactionType] : '';
+                this.updatePostReactionBadges(result.counts || {});
             }
         } catch (e) {
             // Silently fail
         } finally {
-            setTimeout(() => { btn.disabled = false; }, 500);
+            setTimeout(() => {
+                toggleEls.forEach(el => el.disabled = false);
+            }, 500);
         }
     }
 
     renderPostReactionsSection(counts = {}) {
-        const reactions = [
-            { type: 'heart',     emoji: '❤️',  label: 'Love it' },
-            { type: 'thumbsup',  emoji: '👍', label: 'Good point' },
-            { type: 'lightbulb', emoji: '👎', label: 'Dislike' },
-            { type: 'funny',     emoji: '😄', label: 'Funny' },
-        ];
-        const buttonsHtml = reactions.map(r => {
+        const reactions = this.getReactionDefinitions();
+        const usedReactions = reactions.filter(r => (counts[r.type] || 0) > 0);
+        const badgesHtml = usedReactions.map(r => {
             const count = counts[r.type] || 0;
             const voted = this.hasPostReacted(r.type);
             return `<button class="btn-reaction btn-post-reaction btn-reaction-${r.type}${voted ? ' voted' : ''}"
-                            data-reaction="${r.type}"
-                            onclick="commentsWidget.handlePostReaction('${r.type}')"
-                            title="${r.label}">
-                        <span class="reaction-emoji">${r.emoji}</span><span class="reaction-count">${count > 0 ? count : ''}</span>
-                    </button>`;
+                                    data-reaction-target="post"
+                                    data-reaction="${r.type}"
+                                    onclick="commentsWidget.handlePostReaction('${r.type}')"
+                                    title="${r.label}">
+                                <span class="reaction-emoji">${r.emoji}</span><span class="reaction-count">${count > 0 ? count : ''}</span>
+                            </button>`;
         }).join('');
+
         return `
             <div class="post-reactions-section">
                 <span class="post-reactions-label"></span>
-                <div class="reactions-bar">${buttonsHtml}</div>
+                <div class="post-reactions-badges${usedReactions.length === 0 ? ' no-badges' : ''}" id="post-reaction-badges">
+                    ${badgesHtml}
+                </div>
+                <div class="reaction-picker-wrap" id="cs-post-reaction-picker-wrap">
+                    <button type="button"
+                            class="btn-reaction-add"
+                            data-reaction-target="post"
+                            onclick="commentsWidget.togglePostReactionPicker()"
+                            aria-label="Add reaction"
+                            title="Add reaction">
+                        <svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" height="18" aria-hidden="true" data-component="Octicon" viewBox="0 0 16 16" version="1.1" width="18" data-view-component="true" class="octicon octicon-smiley social-button-emoji">    <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm3.82 1.636a.75.75 0 0 1 1.038.175l.007.009c.103.118.22.222.35.31.264.178.683.37 1.285.37.602 0 1.02-.192 1.285-.371.13-.088.247-.192.35-.31l.007-.008a.75.75 0 0 1 1.222.87l-.022-.015c.02.013.021.015.021.015v.001l-.001.002-.002.003-.005.007-.014.019a2.066 2.066 0 0 1-.184.213c-.16.166-.338.316-.53.445-.63.418-1.37.638-2.127.629-.946 0-1.652-.308-2.126-.63a3.331 3.331 0 0 1-.715-.657l-.014-.02-.005-.006-.002-.003v-.002h-.001l.613-.432-.614.43a.75.75 0 0 1 .183-1.044ZM12 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM5 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm5.25 2.25.592.416a97.71 97.71 0 0 0-.592-.416Z" fill="#9198A1"></path></svg>
+                    </button>
+                    <div class="cs-reaction-picker" role="menu" aria-hidden="true">
+                        ${this.getReactionDefinitions().map(r => {
+                            return `<button type="button"
+                                            class="reaction-picker-emoji"
+                                            data-reaction-target="post"
+                                            data-reaction="${r.type}"
+                                            onclick="commentsWidget.handlePostReaction('${r.type}')"
+                                            title="${r.label}">
+                                        <span class="reaction-picker-emoji-visual">${r.emoji}</span>
+                                    </button>`;
+                        }).join('')}
+                    </div>
+                </div>
             </div>
         `;
     }
@@ -123,10 +199,11 @@ class CommentSystem {
     }
 
     async handleVote(commentId, reactionType) {
-        const btn = document.querySelector(`.btn-reaction[data-comment-id="${commentId}"][data-reaction="${reactionType}"]`);
-        if (!btn || btn.disabled) return;
+        this.closeAllReactionPickers();
 
-        btn.disabled = true;
+        const toggleEls = document.querySelectorAll(`.btn-reaction[data-comment-id="${commentId}"][data-reaction="${reactionType}"], .reaction-picker-emoji[data-comment-id="${commentId}"][data-reaction="${reactionType}"]`);
+        if ([...toggleEls].some(el => el.disabled)) return;
+        toggleEls.forEach(el => el.disabled = true);
         try {
             const response = await fetch(`${this.apiUrl}?action=vote`, {
                 method: 'POST',
@@ -147,16 +224,86 @@ class CommentSystem {
                 }
                 this.setVotedComments(data);
 
-                // Update button
-                btn.classList.toggle('voted', result.voted);
-                const countEl = btn.querySelector('.reaction-count');
-                if (countEl) countEl.textContent = result.counts[reactionType] > 0 ? result.counts[reactionType] : '';
+                // Update badges based on returned counts (insert/remove as needed).
+                this.updateCommentReactionBadges(commentId, result.counts || {});
             }
         } catch (e) {
             // Silently fail — voting is non-critical
         } finally {
-            setTimeout(() => { btn.disabled = false; }, 500);
+            setTimeout(() => {
+                toggleEls.forEach(el => el.disabled = false);
+            }, 500);
         }
+    }
+
+    updateCommentReactionBadges(commentId, counts) {
+        const container = document.getElementById(`comment-reaction-badges-${commentId}`);
+        if (!container) return;
+
+        const used = this.getReactionDefinitions().filter(r => (counts[r.type] || 0) > 0);
+        if (used.length === 0) {
+            container.innerHTML = '';
+            const wrap = document.getElementById(`cs-reaction-picker-wrap-${commentId}`);
+            if (wrap) wrap.classList.add('no-badges');
+            return;
+        }
+
+        const wrap = document.getElementById(`cs-reaction-picker-wrap-${commentId}`);
+        if (wrap) wrap.classList.remove('no-badges');
+        container.innerHTML = used.map(r => {
+            const count = counts[r.type] || 0;
+            const voted = this.hasVoted(commentId, r.type);
+            return `<button class="btn-reaction btn-reaction-${r.type}${voted ? ' voted' : ''}"
+                            data-reaction-target="comment"
+                            data-comment-id="${commentId}"
+                            data-reaction="${r.type}"
+                            onclick="commentsWidget.handleVote(${commentId}, '${r.type}')"
+                            title="${r.label}">
+                        <span class="reaction-emoji">${r.emoji}</span><span class="reaction-count">${count > 0 ? count : ''}</span>
+                    </button>`;
+        }).join('');
+    }
+
+    updatePostReactionBadges(counts) {
+        const container = document.getElementById('post-reaction-badges');
+        if (!container) return;
+
+        const used = this.getReactionDefinitions().filter(r => (counts[r.type] || 0) > 0);
+        if (used.length === 0) {
+            container.innerHTML = '';
+            container.classList.add('no-badges');
+            return;
+        }
+
+        container.classList.remove('no-badges');
+        container.innerHTML = used.map(r => {
+            const count = counts[r.type] || 0;
+            const voted = this.hasPostReacted(r.type);
+            return `<button class="btn-reaction btn-post-reaction btn-reaction-${r.type}${voted ? ' voted' : ''}"
+                            data-reaction-target="post"
+                            data-reaction="${r.type}"
+                            onclick="commentsWidget.handlePostReaction('${r.type}')"
+                            title="${r.label}">
+                        <span class="reaction-emoji">${r.emoji}</span><span class="reaction-count">${count > 0 ? count : ''}</span>
+                    </button>`;
+        }).join('');
+    }
+
+    toggleReactionPicker(commentId) {
+        const wrap = document.getElementById(`cs-reaction-picker-wrap-${commentId}`);
+        if (!wrap) return;
+
+        const isOpen = wrap.classList.contains('open');
+        this.closeAllReactionPickers();
+        if (!isOpen) wrap.classList.add('open');
+    }
+
+    togglePostReactionPicker() {
+        const wrap = document.getElementById('cs-post-reaction-picker-wrap');
+        if (!wrap) return;
+        const isOpen = wrap.classList.contains('open');
+        this.closeAllReactionPickers();
+        if (!isOpen) wrap.classList.add('open');
     }
 
     async init() {
@@ -373,23 +520,50 @@ class CommentSystem {
         const isPending = comment.status === 'pending';
         const pendingBadge = isPending ? '<span class="badge-pending">در انتظار بررسی</span>' : '';
 
-        const reactions = [
-            { type: 'heart',     emoji: '❤️',  label: 'Love it' },
-            { type: 'thumbsup',  emoji: '👍', label: 'Good point' },
-            { type: 'lightbulb', emoji: '👎', label: 'Dislike' },
-            { type: 'funny',     emoji: '😄', label: 'Funny' },
-        ];
-        const reactionsHtml = reactions.map(r => {
-            const count = comment[`votes_${r.type}`] || 0;
+        const reactionCounts = this.getCommentReactionCounts(comment);
+        const reactions = this.getReactionDefinitions();
+        const usedReactions = reactions.filter(r => (reactionCounts[r.type] || 0) > 0);
+        const hasAnyReactions = usedReactions.length > 0;
+        const reactionsHtml = usedReactions.map(r => {
+            const count = reactionCounts[r.type] || 0;
             const voted = this.hasVoted(comment.id, r.type);
             return `<button class="btn-reaction btn-reaction-${r.type}${voted ? ' voted' : ''}"
+                            data-reaction-target="comment"
                             data-comment-id="${comment.id}" data-reaction="${r.type}"
                             onclick="commentsWidget.handleVote(${comment.id}, '${r.type}')"
                             title="${r.label}">
                         <span class="reaction-emoji">${r.emoji}</span><span class="reaction-count">${count > 0 ? count : ''}</span>
                     </button>`;
         }).join('');
-        const upvoteBtn = isPending ? '' : `<div class="reactions-bar">${reactionsHtml}</div>`;
+
+        const upvoteBtn = isPending ? '' : `
+            <div class="reaction-picker-wrap${hasAnyReactions ? '' : ' no-badges'}" id="cs-reaction-picker-wrap-${comment.id}">
+                <div class="comment-reaction-badges" id="comment-reaction-badges-${comment.id}">
+                    ${reactionsHtml}
+                </div>
+                <button type="button"
+                        class="btn-reaction-add"
+                        data-reaction-target="comment"
+                        onclick="commentsWidget.toggleReactionPicker(${comment.id})"
+                        aria-label="Add reaction"
+                        title="Add reaction">
+                    <svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" height="18" aria-hidden="true" data-component="Octicon" viewBox="0 0 16 16" version="1.1" width="18" data-view-component="true" class="octicon octicon-smiley social-button-emoji">    <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm3.82 1.636a.75.75 0 0 1 1.038.175l.007.009c.103.118.22.222.35.31.264.178.683.37 1.285.37.602 0 1.02-.192 1.285-.371.13-.088.247-.192.35-.31l.007-.008a.75.75 0 0 1 1.222.87l-.022-.015c.02.013.021.015.021.015v.001l-.001.002-.002.003-.005.007-.014.019a2.066 2.066 0 0 1-.184.213c-.16.166-.338.316-.53.445-.63.418-1.37.638-2.127.629-.946 0-1.652-.308-2.126-.63a3.331 3.331 0 0 1-.715-.657l-.014-.02-.005-.006-.002-.003v-.002h-.001l.613-.432-.614.43a.75.75 0 0 1 .183-1.044ZM12 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM5 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm5.25 2.25.592.416a97.71 97.71 0 0 0-.592-.416Z" fill="#9198A1"></path></svg>
+                </button>
+                <div class="cs-reaction-picker" role="menu" aria-hidden="true">
+                    ${reactions.map(r => {
+                        return `<button type="button"
+                                        class="reaction-picker-emoji"
+                                        data-reaction-target="comment"
+                                        data-comment-id="${comment.id}"
+                                        data-reaction="${r.type}"
+                                        onclick="commentsWidget.handleVote(${comment.id}, '${r.type}')"
+                                        title="${r.label}">
+                                    <span class="reaction-picker-emoji-visual">${r.emoji}</span>
+                                </button>`;
+                    }).join('')}
+                </div>
+            </div>
+        `;
 
         let html = `
             <div class="comment ${isPending ? 'comment-pending' : ''}" id="comment-${comment.id}" style="margin-right: ${depth * 30}px">

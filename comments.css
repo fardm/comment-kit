@@ -43,6 +43,12 @@
     --cs-reaction-lightbulb-color: #f59e0b;
     --cs-reaction-funny-color: #10b981;
 
+    /* Reaction picker (popover) */
+    --cs-popover-bg: #ffffff;
+    --cs-popover-border: rgba(0, 0, 0, 0.08);
+    --cs-popover-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    --cs-popover-btn-hover-bg: rgba(0, 0, 0, 0.05);
+
     --cs-message-success-bg: #d4edda;
     --cs-message-success-text: #155724;
     --cs-message-error-bg: #f8d7da;
@@ -95,6 +101,11 @@
     --cs-reaction-thumbsup-color: #60a5fa;
     --cs-reaction-lightbulb-color: #fbbf24;
     --cs-reaction-funny-color: #34d399;
+
+    --cs-popover-bg: #111827;
+    --cs-popover-border: rgba(255, 255, 255, 0.12);
+    --cs-popover-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    --cs-popover-btn-hover-bg: rgba(255, 255, 255, 0.07);
     --cs-message-success-bg: rgba(21, 87, 36, 0.4);
     --cs-message-success-text: #e2e3e5;
     --cs-message-error-bg: rgba(114, 28, 36, 0.4);
@@ -288,6 +299,108 @@
     flex-wrap: wrap;
 }
 
+#comments-container .comments-system .comment-reaction-badges,
+#comments-container .comments-system .post-reactions-badges {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#comments-container .comments-system .reaction-picker-wrap.no-badges .comment-reaction-badges {
+    display: none;
+}
+
+#comments-container .comments-system .post-reactions-badges.no-badges {
+    display: none;
+}
+
+.comments-system .reaction-picker-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    /* Keep the add button visually aligned with badges */
+    gap: 0.35rem;
+}
+
+#comments-container .comments-system .btn-reaction-add {
+    background: transparent !important;
+    border: 1px solid var(--cs-btn-reaction-border) !important;
+    color: var(--cs-btn-reaction-color) !important;
+    padding: 0.5rem !important;
+    font-size: 1.1rem !important;
+    line-height: 1 !important;
+    border-radius: 999px !important;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s, border-color 0.15s !important;
+    display: flex;
+}
+
+#comments-container .comments-system .btn-reaction-add:hover {
+    background: var(--cs-btn-reaction-hover-bg) !important;
+}
+
+#comments-container .comments-system .btn-reaction-add:active {
+    transform: scale(0.96);
+}
+
+.comments-system .cs-reaction-picker {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 6px);
+    left: 0;
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+
+    padding: 0.35rem;
+    background: var(--cs-popover-bg);
+    border: 1px solid var(--cs-popover-border);
+    border-radius: 12px;
+    box-shadow: var(--cs-popover-shadow);
+
+    min-width: 210px;
+
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.comments-system .reaction-picker-wrap.open .cs-reaction-picker {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.comments-system .reaction-picker-emoji {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.comments-system .reaction-picker-emoji:hover {
+    background: var(--cs-popover-btn-hover-bg);
+    transform: translateY(-1px);
+}
+
+.comments-system .reaction-picker-emoji:active {
+    transform: translateY(0);
+}
+
+.comments-system .reaction-picker-emoji:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 #comments-container .comments-system button.btn-reaction {
     background: transparent !important;
     border: 1px solid var(--cs-btn-reaction-border) !important;
@@ -332,6 +445,13 @@
 #comments-container .comments-system button.btn-reaction-funny.voted {
     color: var(--cs-reaction-funny-color) !important;
     border-color: var(--cs-reaction-funny-color) !important;
+}
+
+#comments-container .comments-system button.btn-reaction.voted {
+    /* Fallback styling for new reaction types */
+    color: var(--cs-link-color) !important;
+    border-color: var(--cs-link-color) !important;
+    background: rgba(74, 144, 226, 0.08) !important;
 }
 
 .comments-system .reaction-emoji {

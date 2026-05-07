@@ -233,7 +233,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="stat-heart">0</div>
-                    <div class="stat-label">♥ Love it</div>
+                    <div class="stat-label">❤️ Love it</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="stat-thumbsup">0</div>
@@ -241,11 +241,15 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="stat-lightbulb">0</div>
-                    <div class="stat-label">💡 Interesting</div>
+                    <div class="stat-label">👎 Dislike</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="stat-funny">0</div>
                     <div class="stat-label">😄 Funny</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-other">0</div>
+                    <div class="stat-label">Other reactions</div>
                 </div>
             </div>
 
@@ -357,6 +361,16 @@
             document.getElementById('stat-thumbsup').textContent  = pages.reduce((s, p) => s + (parseInt(p.thumbsup)  || 0), 0);
             document.getElementById('stat-lightbulb').textContent = pages.reduce((s, p) => s + (parseInt(p.lightbulb) || 0), 0);
             document.getElementById('stat-funny').textContent     = pages.reduce((s, p) => s + (parseInt(p.funny)     || 0), 0);
+
+            const known = new Set(['heart', 'thumbsup', 'lightbulb', 'funny']);
+            let otherTotal = 0;
+            pages.forEach(p => {
+                const reactions = p.reactions || {};
+                Object.entries(reactions).forEach(([type, count]) => {
+                    if (!known.has(type)) otherTotal += parseInt(count) || 0;
+                });
+            });
+            document.getElementById('stat-other').textContent = otherTotal;
         }
 
         function displayReactions(pages) {
@@ -366,15 +380,30 @@
                 return;
             }
 
+            const emojiByType = {
+                thumbsup: '👍',
+                lightbulb: '👎',
+                pray: '🙏',
+                ok: '👌',
+                fire: '🔥',
+                heart: '❤️',
+                frown: '☹️',
+                rage: '😡',
+                funny: '😄',
+                neutral: '😐'
+            };
+            const known = new Set(['heart', 'thumbsup', 'lightbulb', 'funny']);
+
             container.innerHTML = `
                 <table>
                     <thead>
                         <tr>
                             <th>Page</th>
-                            <th class="reaction-cell">♥</th>
+                            <th class="reaction-cell">❤️</th>
                             <th class="reaction-cell">👍</th>
-                            <th class="reaction-cell">💡</th>
+                            <th class="reaction-cell">👎</th>
                             <th class="reaction-cell">😄</th>
+                            <th class="reaction-cell">More</th>
                             <th class="reaction-cell">Total</th>
                             <th class="actions-cell">Actions</th>
                         </tr>
@@ -387,6 +416,16 @@
                                 <td class="reaction-cell">${p.thumbsup || 0}</td>
                                 <td class="reaction-cell">${p.lightbulb || 0}</td>
                                 <td class="reaction-cell">${p.funny || 0}</td>
+                                <td class="reaction-cell">
+                                    ${(() => {
+                                        const reactions = p.reactions || {};
+                                        const more = Object.entries(reactions)
+                                            .filter(([type, count]) => (parseInt(count) || 0) > 0 && !known.has(type))
+                                            .map(([type, count]) => `${emojiByType[type] || type} ${count}`)
+                                            .join('&nbsp;&nbsp;');
+                                        return more || '-';
+                                    })()}
+                                </td>
                                 <td class="total-cell">${p.total || 0}</td>
                                 <td class="actions-cell">
                                     <button class="btn btn-danger btn-sm"

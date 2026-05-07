@@ -103,6 +103,32 @@ if (!$db) {
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
+function getReactionDefinitions() {
+    // DB stores `reaction_type` strings in `votes` and `post_reactions`.
+    // Keep these stable to preserve persistence/backward compatibility.
+    return [
+        'thumbsup'  => ['emoji' => '👍',  'label' => '👍 thumbs up'],
+        'lightbulb' => ['emoji' => '👎',  'label' => '👎 thumbs down'],
+        'pray'      => ['emoji' => '🙏',  'label' => '🙏 prayer'],
+        'ok'        => ['emoji' => '👌',  'label' => '👌 okay'],
+        'fire'      => ['emoji' => '🔥',  'label' => '🔥 fire'],
+        'heart'     => ['emoji' => '❤️',  'label' => '❤️ heart'],
+        'frown'     => ['emoji' => '☹️',  'label' => '☹️ frown'],
+        'rage'      => ['emoji' => '😡',  'label' => '😡 angry'],
+        'funny'     => ['emoji' => '😄',  'label' => '😄 laugh'],
+        'neutral'   => ['emoji' => '😐',  'label' => '😐 neutral'],
+    ];
+}
+
+function getAllowedReactionTypes() {
+    return array_keys(getReactionDefinitions());
+}
+
+function getReactionEmailLabel($reactionType) {
+    $defs = getReactionDefinitions();
+    return $defs[$reactionType]['label'] ?? $reactionType;
+}
+
 // Periodic housekeeping: prune rows that are no longer useful.
 // Runs on ~1% of requests to avoid adding overhead to every call.
 function periodicCleanup($db) {
@@ -443,13 +469,7 @@ function sendPostReactionNotificationEmail($pageUrl, $reactionType) {
     }
     $adminEmail = $result['value'];
 
-    $reactionLabels = [
-        'heart'     => '♥ heart',
-        'thumbsup'  => '👍 thumbs up',
-        'lightbulb' => '💡 lightbulb',
-        'funny'     => '😄 laugh',
-    ];
-    $reactionLabel = $reactionLabels[$reactionType] ?? $reactionType;
+    $reactionLabel = getReactionEmailLabel($reactionType);
     $fullPageUrl = "https://" . $_SERVER['HTTP_HOST'] . $pageUrl;
     $safePageUrl = sanitizeEmailContent($fullPageUrl);
 
@@ -475,13 +495,7 @@ function sendReactionNotificationEmail($commentId, $pageUrl, $authorName, $autho
         return;
     }
 
-    $reactionLabels = [
-        'heart'     => '♥ heart',
-        'thumbsup'  => '👍 thumbs up',
-        'lightbulb' => '💡 lightbulb',
-        'funny'     => '😄 laugh',
-    ];
-    $reactionLabel = $reactionLabels[$reactionType] ?? $reactionType;
+    $reactionLabel = getReactionEmailLabel($reactionType);
 
     $safeAuthorName = sanitizeEmailContent($authorName);
     $fullPageUrl = "https://" . $_SERVER['HTTP_HOST'] . $pageUrl;
@@ -552,12 +566,37 @@ if ($method === 'GET' && $action === 'comments') {
     $stmt->execute(array_merge([$pageUrl], $status, [$limit, $offset]));
     $comments = $stmt->fetchAll();
 
+    // Fetch reaction counts for all reaction_type values (used by the GitHub-style picker UI).
+    $votesByCommentId = [];
+    if (count($comments) > 0) {
+        $commentIds = array_map(fn($c) => (int)$c['id'], $comments);
+        $chunkSize = 500; // avoid SQLite max parameter limits
+        for ($i = 0; $i < count($commentIds); $i += $chunkSize) {
+            $chunk = array_slice($commentIds, $i, $chunkSize);
+            if (count($chunk) === 0) continue;
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $vStmt = $db->prepare("
+                SELECT comment_id, reaction_type, COUNT(*) as count
+                FROM votes
+                WHERE comment_id IN ($placeholders)
+                GROUP BY comment_id, reaction_type
+            ");
+            $vStmt->execute($chunk);
+            foreach ($vStmt->fetchAll() as $row) {
+                $cid = (int)$row['comment_id'];
+                $type = $row['reaction_type'];
+                $votesByCommentId[$cid][$type] = (int)$row['count'];
+            }
+        }
+    }
+
     // Build threaded structure
     $threaded = [];
     $lookup = [];
 
     foreach ($comments as $comment) {
         $comment['replies'] = [];
+        $comment['votes_by_reaction_type'] = $votesByCommentId[(int)$comment['id']] ?? [];
         // Don't expose email to non-admins
         if (!isAdmin()) {
             unset($comment['author_email']);
@@ -574,13 +613,11 @@ if ($method === 'GET' && $action === 'comments') {
     }
 
     // Fetch post-level reaction counts for this page (single query)
-    $postReactions = ['heart' => 0, 'thumbsup' => 0, 'lightbulb' => 0, 'funny' => 0];
+    $postReactions = array_fill_keys(getAllowedReactionTypes(), 0);
     $prStmt = $db->prepare("SELECT reaction_type, COUNT(*) as count FROM post_reactions WHERE page_url = ? GROUP BY reaction_type");
     $prStmt->execute([$pageUrl]);
     foreach ($prStmt->fetchAll() as $row) {
-        if (isset($postReactions[$row['reaction_type']])) {
-            $postReactions[$row['reaction_type']] = (int)$row['count'];
-        }
+        if (isset($postReactions[$row['reaction_type']])) $postReactions[$row['reaction_type']] = (int)$row['count'];
     }
 
     jsonResponse([
@@ -633,7 +670,7 @@ if ($method === 'POST' && $action === 'vote') {
         jsonResponse(['error' => 'Invalid comment ID'], 400);
     }
 
-    $allowedTypes = ['heart', 'thumbsup', 'lightbulb', 'funny'];
+    $allowedTypes = getAllowedReactionTypes();
     $reactionType = $input['reaction_type'] ?? 'heart';
     if (!in_array($reactionType, $allowedTypes)) {
         jsonResponse(['error' => 'Invalid reaction type'], 400);
@@ -798,13 +835,13 @@ if ($method === 'POST' && $action === 'post') {
     }
 
     // Generate appropriate message
-    $message = 'Comment posted successfully';
+    $message = 'نظر شما با موفقیت منتشر شد';
     if ($status === 'spam') {
         $message = 'Comment marked as spam';
     } else if ($status === 'pending') {
-        $message = 'Comment submitted for moderation';
+        $message = 'نظر شما برای بررسی ارسال شد';
     } else if ($isTrustedCommenter) {
-        $message = 'Comment posted successfully (auto-approved)';
+        $message = 'نظر شما با موفقیت منتشر شد (به طور خودکار تایید شد)';
     }
 
     jsonResponse([
@@ -967,6 +1004,36 @@ if ($method === 'GET' && $action === 'pending') {
     $stmt->execute([$limit, $offset]);
     $comments = $stmt->fetchAll();
 
+    // Additional per-comment reaction counts for arbitrary reaction_type values
+    // (used by the GitHub-style reaction UI).
+    $votesByCommentId = [];
+    if (count($comments) > 0) {
+        $commentIds = array_map(fn($c) => (int)$c['id'], $comments);
+        $chunkSize = 500; // avoid SQLite max parameter limits
+        for ($i = 0; $i < count($commentIds); $i += $chunkSize) {
+            $chunk = array_slice($commentIds, $i, $chunkSize);
+            if (count($chunk) === 0) continue;
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $vStmt = $db->prepare("
+                SELECT comment_id, reaction_type, COUNT(*) as count
+                FROM votes
+                WHERE comment_id IN ($placeholders)
+                GROUP BY comment_id, reaction_type
+            ");
+            $vStmt->execute($chunk);
+            foreach ($vStmt->fetchAll() as $row) {
+                $cid = (int)$row['comment_id'];
+                $type = $row['reaction_type'];
+                $votesByCommentId[$cid][$type] = (int)$row['count'];
+            }
+        }
+    }
+
+    foreach ($comments as &$c) {
+        $c['votes_by_reaction_type'] = $votesByCommentId[(int)$c['id']] ?? [];
+    }
+    unset($c);
+
     jsonResponse([
         'comments' => $comments,
         'pagination' => [
@@ -1040,6 +1107,35 @@ if ($method === 'GET' && $action === 'all') {
     ");
     $stmt->execute(array_merge($params, [$limit, $offset]));
     $comments = $stmt->fetchAll();
+
+    // Additional per-comment reaction counts for arbitrary reaction_type values.
+    $votesByCommentId = [];
+    if (count($comments) > 0) {
+        $commentIds = array_map(fn($c) => (int)$c['id'], $comments);
+        $chunkSize = 500; // avoid SQLite max parameter limits
+        for ($i = 0; $i < count($commentIds); $i += $chunkSize) {
+            $chunk = array_slice($commentIds, $i, $chunkSize);
+            if (count($chunk) === 0) continue;
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $vStmt = $db->prepare("
+                SELECT comment_id, reaction_type, COUNT(*) as count
+                FROM votes
+                WHERE comment_id IN ($placeholders)
+                GROUP BY comment_id, reaction_type
+            ");
+            $vStmt->execute($chunk);
+            foreach ($vStmt->fetchAll() as $row) {
+                $cid = (int)$row['comment_id'];
+                $type = $row['reaction_type'];
+                $votesByCommentId[$cid][$type] = (int)$row['count'];
+            }
+        }
+    }
+
+    foreach ($comments as &$c) {
+        $c['votes_by_reaction_type'] = $votesByCommentId[(int)$c['id']] ?? [];
+    }
+    unset($c);
 
     jsonResponse([
         'comments'   => $comments,
@@ -1297,21 +1393,46 @@ if ($method === 'GET' && $action === 'post_reactions_summary') {
     }
 
     $stmt = $db->query("
-        SELECT page_url,
-               SUM(CASE WHEN reaction_type = 'heart'     THEN 1 ELSE 0 END) AS heart,
-               SUM(CASE WHEN reaction_type = 'thumbsup'  THEN 1 ELSE 0 END) AS thumbsup,
-               SUM(CASE WHEN reaction_type = 'lightbulb' THEN 1 ELSE 0 END) AS lightbulb,
-               SUM(CASE WHEN reaction_type = 'funny'     THEN 1 ELSE 0 END) AS funny,
-               COUNT(*) AS total
+        SELECT page_url, reaction_type, COUNT(*) as count
         FROM post_reactions
-        GROUP BY page_url
-        ORDER BY total DESC
+        GROUP BY page_url, reaction_type
     ");
-    $rows = $stmt->fetchAll();
 
-    $totalCount = array_sum(array_column($rows, 'total'));
+    $byPage = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $pageUrl = $row['page_url'];
+        $type = $row['reaction_type'];
+        $cnt = (int)$row['count'];
 
-    jsonResponse(['pages' => $rows, 'total' => $totalCount]);
+        if (!isset($byPage[$pageUrl])) {
+            $byPage[$pageUrl] = [
+                'page_url' => $pageUrl,
+                'total' => 0,
+                // Keep legacy keys for older admin UI code.
+                'heart' => 0,
+                'thumbsup' => 0,
+                'lightbulb' => 0,
+                'funny' => 0,
+                // New: full per-type counts for the extended emoji set.
+                'reactions' => [],
+            ];
+        }
+
+        $byPage[$pageUrl]['total'] += $cnt;
+        $byPage[$pageUrl]['reactions'][$type] = $cnt;
+
+        // Legacy keys (still required by existing admin JS).
+        if (isset($byPage[$pageUrl][$type])) {
+            $byPage[$pageUrl][$type] = $cnt;
+        }
+    }
+
+    $pages = array_values($byPage);
+    usort($pages, fn($a, $b) => ($b['total'] ?? 0) <=> ($a['total'] ?? 0));
+
+    $totalCount = array_sum(array_map(fn($p) => (int)($p['total'] ?? 0), $pages));
+
+    jsonResponse(['pages' => $pages, 'total' => $totalCount]);
 }
 
 // GET /api.php?action=posts_summary (admin)
@@ -1531,7 +1652,7 @@ if ($method === 'POST' && $action === 'post_reaction') {
         jsonResponse(['error' => 'page_url is required'], 400);
     }
 
-    $allowedTypes = ['heart', 'thumbsup', 'lightbulb', 'funny'];
+    $allowedTypes = getAllowedReactionTypes();
     $reactionType = $input['reaction_type'] ?? 'heart';
     if (!in_array($reactionType, $allowedTypes)) {
         jsonResponse(['error' => 'Invalid reaction type'], 400);

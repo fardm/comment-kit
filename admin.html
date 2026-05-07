@@ -520,12 +520,28 @@
                     <div><strong>IP:</strong> ${escapeHtml(comment.ip_address || 'N/A')}</div>
                     <div class="comment-content">${escapeHtml(comment.content)}</div>
                     ${(() => {
-                        const reactionSummary = [
-                            { emoji: '♥', count: comment.votes_heart || 0 },
-                            { emoji: '👍', count: comment.votes_thumbsup || 0 },
-                            { emoji: '💡', count: comment.votes_lightbulb || 0 },
-                            { emoji: '😄', count: comment.votes_funny || 0 },
-                        ].filter(r => r.count > 0).map(r => `${r.emoji} ${r.count}`).join('&nbsp;&nbsp;');
+                        const votes = comment.votes_by_reaction_type || {
+                            heart: comment.votes_heart || 0,
+                            thumbsup: comment.votes_thumbsup || 0,
+                            lightbulb: comment.votes_lightbulb || 0,
+                            funny: comment.votes_funny || 0,
+                        };
+                        const reactionDefs = [
+                            { type: 'thumbsup',  emoji: '👍' },
+                            { type: 'lightbulb', emoji: '👎' },
+                            { type: 'pray',      emoji: '🙏' },
+                            { type: 'ok',        emoji: '👌' },
+                            { type: 'fire',      emoji: '🔥' },
+                            { type: 'heart',     emoji: '❤️' },
+                            { type: 'frown',     emoji: '☹️' },
+                            { type: 'rage',      emoji: '😡' },
+                            { type: 'funny',     emoji: '😄' },
+                            { type: 'neutral',   emoji: '😐' },
+                        ];
+                        const reactionSummary = reactionDefs
+                            .filter(r => (votes[r.type] || 0) > 0)
+                            .map(r => `${r.emoji} ${votes[r.type]}`)
+                            .join('&nbsp;&nbsp;');
                         return reactionSummary ? `<div><strong>Reactions:</strong> ${reactionSummary}</div>` : '';
                     })()}
                     <div class="comment-actions">
