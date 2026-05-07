@@ -357,6 +357,9 @@ class CommentSystem {
                 <div class="form-group">
                     <input type="url" name="author_url" placeholder="وب سایت" class="form-input" value="${this.escapeHtml(savedInfo.url)}">
                 </div>
+                <div class="form-group" aria-hidden="true" style="position: absolute; opacity: 0; top: 0; left: 0; height: 0; width: 0; z-index: -1; overflow: hidden; pointer-events: none;">
+                    <input type="text" name="website" placeholder="Website" class="form-input" tabindex="-1" autocomplete="off">
+                </div>
                 <div class="form-group">
                     <textarea name="content" placeholder="کامنت شما *" required class="form-textarea" rows="4"></textarea>
                 </div>
