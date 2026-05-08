@@ -1,0 +1,219 @@
+/* Colors ---------------------------------- */
+:root {
+    --light: #f9fafb;
+    --lightgray: #dfdfdf;
+    --gray: #cacaca;
+    --darkgray: #252525;
+    --dark: #1e1e1e;
+    --primary: #287cdb;
+    --on-primary: #ffffff;
+    --secondary: #fbd307;
+    --on-secondary: #1b1b1b;
+    --error: #de3b3b;
+    --background: #f3f3f3;
+    --on-background: #ffffff;
+    --shadow: #f3f3f399;
+    --body-text: #141414;
+    --heading-text: #0a0a0a;
+}
+
+[data-theme="dark"] {
+    --light: #111827;
+    --lightgray: #424d5f;
+    --gray: #646464;
+    --darkgray: #e6e7f7;
+    --dark: #f7f8ff;
+    --primary: #4a90e2;
+    --on-primary: #ffffff;
+    --secondary: #fad623;
+    --on-secondary: #1b1b1b;
+    --error: #de3b3b;
+    --background: #141820;
+    --on-background: #212836;
+    --shadow: #1418204a;
+    --body-text: #dee5f3;
+    --heading-text: #ffffff;
+}
+
+
+
+
+body {
+    background: var(--background) !important;
+}
+
+h1 {
+    color: var(--primary);
+}
+
+
+h2, h3, h4, h5, h6 {
+    color: var(--heading-text) !important;
+}
+
+li, p, span, input, label, select, td, th, .badge-pending, .body-text, .stat-label {
+    color: var(--body-text) !important;
+}
+
+text {
+    color: var(--body-text) !important;
+    fill: var(--body-text) !important;
+}
+
+.nav a:hover {
+    background: #4a90e226 !important;
+}
+.nav a.active {
+    background: #4a90e226 !important;
+}
+
+.gray {
+    color: var(--darkgray) !important;
+}
+
+a {
+    color: var(--primary) !important;
+    text-decoration: none;
+}
+
+
+header {
+    background: var(--on-background) !important;
+}
+
+.stat-card {
+    background: var(--on-background) !important;
+}
+
+.comments-section {
+    background: var(--on-background) !important;
+}
+
+#login-section {
+    background: var(--on-background) !important;
+}
+
+.filters {
+    background: var(--on-background) !important;
+}
+
+.comment-content {
+    background: var(--light) !important;
+    color: var(--body-text) !important;
+    direction: rtl !important;
+}
+
+.section-card {
+    background: var(--on-background) !important;
+}
+
+th {
+    background: var(--light) !important;
+}
+
+.db-stat-item {
+    background: var(--light) !important;
+    border: solid 1px var(--gray) !important;
+}
+
+.controls {
+    background: var(--on-background) !important;
+}
+
+.posts-section {
+    background: var(--on-background) !important;
+}
+
+.btn-primary {
+    color: var(--on-primary) !important;
+}
+
+.badge-approved {
+    background: #50df7236 !important;
+}
+
+.badge-total {
+    background: var(--gray) !important;
+}
+
+input, select {
+    background: var(--light) !important;
+}
+
+.chart-card, .util-card, .preview-box {
+    background: var(--on-background) !important;
+}
+
+span.badge-pending {
+    color: #333 !important;
+}
+
+div.comment-actions {
+    margin-top: 1rem !important;
+}
+
+
+
+
+/* icon */
+
+.section-icons {
+    display: flex;
+    gap: 8px;
+}
+
+.header-icon {
+    display: flex;
+    padding: 8px;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.4s;
+    background: var(--on-background);
+}
+
+.header-icon:hover {
+    border: 1px solid var(--primary);
+
+}
+
+.header-icon:hover .icon-svg {
+    fill: var(--primary);
+}
+
+.header-icon:active {
+    transform: translate(0, 0.2rem);
+}
+
+
+
+.icon-svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--darkgray);
+}
+
+.icon-svg:hover {
+    /* filter: brightness(150%); */
+    /* fill: var(--primary); */
+}
+
+/* Dark Mode Toggle */
+
+#toggle-switch {
+    display: none;
+}
+
+
+
+
+
+.header-single-page {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0.5rem;
+    justify-content: center;
+    display: flex;
+    background: transparent !important;
+    box-shadow: none !important;
+}

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'">
     <title>Comment System Admin</title>
+    <link rel="stylesheet" href="global.css">
     <style>
         * {
             margin: 0;
@@ -335,6 +336,12 @@
                 <a href="admin-utilities.html">Utilities</a>
                 <a href="#" onclick="logout(); return false;" style="color:#dc3545;">Logout</a>
             </div>
+            <div class="section-icons">
+                <label class="theme-switch">
+                    <input type="checkbox" id="toggle-switch">
+                    <div id="toggle-icon" class="header-icon"></div>
+                </label>
+            </div>
         </header>
 
         <div class="container">
@@ -516,8 +523,8 @@
                         <span>${new Date(comment.created_at).toLocaleString()}</span>
                         <span class="badge badge-pending">Pending</span>
                     </div>
-                    <div><strong>Page:</strong> ${escapeHtml(comment.page_url)}</div>
-                    <div><strong>IP:</strong> ${escapeHtml(comment.ip_address || 'N/A')}</div>
+                    <div class="body-text"><strong>Page:</strong> ${escapeHtml(comment.page_url)}</div>
+                    <div class="body-text"><strong>IP:</strong> ${escapeHtml(comment.ip_address || 'N/A')}</div>
                     <div class="comment-content">${escapeHtml(comment.content)}</div>
                     ${(() => {
                         const votes = comment.votes_by_reaction_type || {
@@ -542,7 +549,7 @@
                             .filter(r => (votes[r.type] || 0) > 0)
                             .map(r => `${r.emoji} ${votes[r.type]}`)
                             .join('&nbsp;&nbsp;');
-                        return reactionSummary ? `<div><strong>Reactions:</strong> ${reactionSummary}</div>` : '';
+                        return reactionSummary ? `<div class="body-text"><strong>Reactions:</strong> ${reactionSummary}</div>` : '';
                     })()}
                     <div class="comment-actions">
                         <button class="btn btn-success" onclick="moderateComment(${comment.id}, 'approved')">Approve</button>
@@ -639,5 +646,6 @@
             location.reload();
         }
     </script>
+    <script src="light-dark-mode-panel.js"></script>
 </body>
 </html>

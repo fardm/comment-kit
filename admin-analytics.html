@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'">
     <title>Comment System Admin - Analytics</title>
+    <link rel="stylesheet" href="global.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -298,7 +299,7 @@
 
 <div id="admin-section">
     <header>
-        <h1>Comment System Admin - Analytics</h1>
+        <h1>Comment System Admin</h1>
         <div class="nav">
             <a href="admin.html">Pending</a>
             <a href="admin-all.html">All Comments</a>
@@ -308,6 +309,12 @@
             <a href="admin-analytics.html" class="active">Analytics</a>
             <a href="admin-utilities.html">Utilities</a>
             <a href="#" onclick="logout(); return false;" style="color:#dc3545;">Logout</a>
+        </div>
+        <div class="section-icons">
+            <label class="theme-switch">
+                <input type="checkbox" id="toggle-switch">
+                <div id="toggle-icon" class="header-icon"></div>
+            </label>
         </div>
     </header>
 
@@ -841,5 +848,6 @@ async function logout() {
     location.reload();
 }
 </script>
+<script src="light-dark-mode-panel.js"></script>
 </body>
 </html>

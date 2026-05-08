@@ -44,6 +44,7 @@ if (!empty($token) && !$success) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unsubscribe from Comment Notifications</title>
+    <link rel="stylesheet" href="global.css">
     <style>
         * {
             margin: 0;
@@ -62,7 +63,7 @@ if (!empty($token) && !$success) {
         .container {
             max-width: 600px;
             margin: 50px auto;
-            background: white;
+            background: var(--on-background);
             padding: 2rem;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -122,8 +123,8 @@ if (!empty($token) && !$success) {
         }
 
         .btn-secondary {
-            background-color: #6c757d;
-            color: white;
+            background-color: var(--gray);
+            color: white !important;
             text-decoration: none;
             display: inline-block;
             margin-left: 1rem;
@@ -139,6 +140,14 @@ if (!empty($token) && !$success) {
     </style>
 </head>
 <body>
+    <header class="header-single-page">
+        <div class="section-icons">
+            <label class="theme-switch">
+                <input type="checkbox" id="toggle-switch">
+                <div id="toggle-icon" class="header-icon"></div>
+            </label>
+        </div>
+    </header>
     <div class="container">
         <h1>Unsubscribe from Comment Notifications</h1>
 
@@ -177,5 +186,6 @@ if (!empty($token) && !$success) {
             </p>
         <?php endif; ?>
     </div>
+    <script src="light-dark-mode-panel.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'">
     <title>Comment System Admin - Posts</title>
+    <link rel="stylesheet" href="global.css">
     <style>
         * {
             margin: 0;
@@ -238,19 +239,7 @@
             min-width: 250px;
         }
 
-        .search-wrapper input {
-            padding-left: 2.25rem;
-        }
 
-        .search-icon {
-            position: absolute;
-            left: 0.7rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-            pointer-events: none;
-            font-style: normal;
-        }
 
         /* Posts table */
         .posts-section {
@@ -331,7 +320,7 @@
         }
 
         tbody tr:hover {
-            background: #f8fbff;
+            background: var(--lightgray);
         }
 
         tbody tr.spam-magnet {
@@ -599,7 +588,7 @@
 
     <div id="admin-section">
         <header>
-            <h1>Comment System Admin - Posts</h1>
+            <h1>Comment System Admin</h1>
             <div class="nav">
                 <a href="admin.html">Pending</a>
                 <a href="admin-all.html">All Comments</a>
@@ -609,6 +598,12 @@
                 <a href="admin-analytics.html">Analytics</a>
                 <a href="admin-utilities.html">Utilities</a>
                 <a href="#" onclick="logout(); return false;" style="color:#dc3545;">Logout</a>
+            </div>
+            <div class="section-icons">
+                <label class="theme-switch">
+                    <input type="checkbox" id="toggle-switch">
+                    <div id="toggle-icon" class="header-icon"></div>
+                </label>
             </div>
         </header>
 
@@ -643,7 +638,6 @@
             <div class="controls">
                 <div class="search-wrapper control-group">
                     <label for="search-input">Search posts</label>
-                    <span class="search-icon">🔍</span>
                     <input type="search" id="search-input" placeholder="Filter by URL…" oninput="onSearchInput()">
                 </div>
                 <div class="control-group" style="max-width: 220px;">
@@ -1041,5 +1035,6 @@
             location.reload();
         }
     </script>
+    <script src="light-dark-mode-panel.js"></script>
 </body>
 </html>
