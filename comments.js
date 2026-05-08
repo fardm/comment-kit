@@ -145,11 +145,8 @@ class CommentSystem {
         }).join('');
 
         return `
+            <h4 class="post-reactions-label">بازخورد</h4>
             <div class="post-reactions-section">
-                <span class="post-reactions-label"></span>
-                <div class="post-reactions-badges${usedReactions.length === 0 ? ' no-badges' : ''}" id="post-reaction-badges">
-                    ${badgesHtml}
-                </div>
                 <div class="reaction-picker-wrap" id="cs-post-reaction-picker-wrap">
                     <button type="button"
                             class="btn-reaction-add"
@@ -171,6 +168,9 @@ class CommentSystem {
                                     </button>`;
                         }).join('')}
                     </div>
+                </div>
+                <div class="post-reactions-badges${usedReactions.length === 0 ? ' no-badges' : ''}" id="post-reaction-badges">
+                    ${badgesHtml}
                 </div>
             </div>
         `;
@@ -541,9 +541,6 @@ class CommentSystem {
 
         const upvoteBtn = isPending ? '' : `
             <div class="reaction-picker-wrap${hasAnyReactions ? '' : ' no-badges'}" id="cs-reaction-picker-wrap-${comment.id}">
-                <div class="comment-reaction-badges" id="comment-reaction-badges-${comment.id}">
-                    ${reactionsHtml}
-                </div>
                 <button type="button"
                         class="btn-reaction-add"
                         data-reaction-target="comment"
@@ -564,6 +561,9 @@ class CommentSystem {
                                     <span class="reaction-picker-emoji-visual">${r.emoji}</span>
                                 </button>`;
                     }).join('')}
+                </div>
+                <div class="comment-reaction-badges" id="comment-reaction-badges-${comment.id}">
+                    ${reactionsHtml}
                 </div>
             </div>
         `;
