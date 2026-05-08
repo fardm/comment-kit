@@ -2,7 +2,7 @@
  * Standalone Comment System - Styles
  */
 
-.comments-system {
+ .comments-system {
     /* CSS Variables for easy theming and adaptation */
     --cs-font-family: inherit;
     --cs-text-color: inherit;
@@ -137,9 +137,8 @@
 }
 
 .comments-system .post-reactions-label {
-    font-size: 0.9rem;
     color: var(--cs-comment-meta-color);
-    white-space: nowrap;
+    text-align: center;
 }
 
 .comments-title {
@@ -457,17 +456,17 @@
 .comments-system .reaction-emoji {
     font-style: normal;
     line-height: 1;
-    filter: grayscale(1) opacity(0.55);
+    /* filter: grayscale(1) opacity(0.55); */
     transition: filter 0.2s;
 }
 
-.comments-system button.btn-reaction.voted .reaction-emoji {
+/* .comments-system button.btn-reaction.voted .reaction-emoji {
     filter: none;
-}
+} */
 
-.comments-system button.btn-reaction:hover .reaction-emoji {
+/* .comments-system button.btn-reaction:hover .reaction-emoji {
     filter: grayscale(0.2) opacity(0.85);
-}
+} */
 
 .comments-system .reaction-count {
     font-size: 0.82rem;
