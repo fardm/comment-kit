@@ -9,7 +9,7 @@
     --on-primary: #ffffff;
     --secondary: #fbd307;
     --on-secondary: #1b1b1b;
-    --error: #de3b3b;
+    --red: #de3b3b;
     --background: #f3f3f3;
     --on-background: #ffffff;
     --shadow: #f3f3f399;
@@ -27,7 +27,7 @@
     --on-primary: #ffffff;
     --secondary: #fad623;
     --on-secondary: #1b1b1b;
-    --error: #de3b3b;
+    --red: #de3b3b;
     --background: #141820;
     --on-background: #212836;
     --shadow: #1418204a;
@@ -51,8 +51,12 @@ h2, h3, h4, h5, h6 {
     color: var(--heading-text) !important;
 }
 
-li, p, span, input, label, select, td, th, .badge-pending, .body-text, .stat-label {
+li, p, span, input, label, select, td, th, .badge-pending, .body-text, .stat-label, .setting-label, .export-info, .drop-label, .export-info, .subscription-email {
     color: var(--body-text) !important;
+}
+
+.subscription-page, .subscription-date {
+    color: var(--gray)
 }
 
 text {
@@ -150,6 +154,14 @@ span.badge-pending {
 
 div.comment-actions {
     margin-top: 1rem !important;
+}
+
+.logout-btn {
+    color: var(--red) !important;
+}
+
+.nav .logout-btn:hover {
+    background: #de3b3b17 !important;
 }
 
 
