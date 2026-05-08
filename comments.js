@@ -324,7 +324,7 @@ class CommentSystem {
                         ${this.renderPostReactionsSection()}
                     </div>
                     <h3 class="comments-title"></h3>
-                    <p class="befor-form-comment">نظرتان را بنویسید. نشانی ایمیل شما منتشر نخواهد شد.</p>
+                    <p class="befor-form-comment">نظرتان را بنویسید.</p>
                     ${formHtml}
                 </div>
                 <div id="comments-list" class="comments-list">
@@ -352,7 +352,7 @@ class CommentSystem {
                     <input type="text" name="author_name" placeholder="نام *" required class="form-input" value="${this.escapeHtml(savedInfo.name)}">
                 </div>
                 <div class="form-group">
-                    <input type="email" name="author_email" placeholder="ایمیل *" required class="form-input" value="${this.escapeHtml(savedInfo.email)}">
+                    <input type="email" name="author_email" placeholder="ایمیل *  (آدرس ایمیل شما منتشر نخواهد شد)" required class="form-input" value="${this.escapeHtml(savedInfo.email)}">
                 </div>
                 <div class="form-group">
                     <input type="url" name="author_url" placeholder="وب سایت" class="form-input" value="${this.escapeHtml(savedInfo.url)}">
@@ -361,18 +361,18 @@ class CommentSystem {
                     <input type="text" name="website" placeholder="Website" class="form-input" tabindex="-1" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <textarea name="content" placeholder="کامنت شما *" required class="form-textarea" rows="4"></textarea>
+                    <textarea name="content" placeholder="متن *" required class="form-textarea" rows="4"></textarea>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" name="subscribe" value="1">
-                        <span>نظرات بعدی در این صفحه را به من اطلاع بده</span>
+                        <span>نظرات بعدی در این صفحه را به ایمیل من ارسال کن.</span>
                     </label>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" name="remember_me" value="1" ${savedInfo.remember ? 'checked' : ''}>
-                        <span>مشخصات من را برای دفعه‌ی بعد به یاد داشته باش</span>
+                        <span>مشخصات من را برای دفعه‌ی بعد به یاد داشته باش.</span>
                     </label>
                 </div>
                 <div class="form-actions">

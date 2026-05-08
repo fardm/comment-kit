@@ -666,3 +666,8 @@
     font-size: 1.5rem !important;
     padding: 0.6rem 0.6rem !important;
 }
+
+#post-reactions-container {
+    border-bottom: solid 1px var(--lightgray);
+    margin-bottom: 2rem;
+}
