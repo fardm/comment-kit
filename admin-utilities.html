@@ -5,106 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'">
     <title>Comment System Admin - Utilities</title>
-    <link rel="stylesheet" href="global.css">
+    <link rel="stylesheet" href="admin.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        header {
-            background: white;
-            padding: 1.5rem 2rem;
-            margin-bottom: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        h1 { color: #4a90e2; }
-
-        .nav { display: flex; gap: 1rem; flex-wrap: wrap; }
-        .nav a {
-            text-decoration: none;
-            color: #666;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: background 0.2s;
-        }
-        .nav a:hover, .nav a.active {
-            background: #e3f2fd;
-            color: #4a90e2;
-        }
-
-        #login-section {
-            max-width: 400px;
-            margin: 100px auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        #admin-section { display: none; }
-
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
-
-        input[type="password"],
-        input[type="email"],
-        input[type="text"] {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 1rem;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-primary { background-color: #4a90e2; color: white; }
-        .btn-primary:hover:not(:disabled) { background-color: #357abd; }
-        .btn-success { background-color: #28a745; color: white; }
-        .btn-success:hover:not(:disabled) { background-color: #218838; }
-        .btn-danger { background-color: #dc3545; color: white; }
-        .btn-danger:hover:not(:disabled) { background-color: #c82333; }
-        .btn-warning { background-color: #ffc107; color: #333; }
-        .btn-warning:hover:not(:disabled) { background-color: #e0a800; }
-        .btn-secondary { background-color: #6c757d; color: white; }
-        .btn-secondary:hover:not(:disabled) { background-color: #5a6268; }
-        .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.875rem; }
-
-        .message {
-            padding: 0.85rem 1rem;
-            margin: 0.75rem 0;
-            border-radius: 4px;
-            font-size: 0.95rem;
-        }
-        .message.error { background-color: #f8d7da; color: #721c24; }
-        .message.success { background-color: #d4edda; color: #155724; }
-        .message.info { background-color: #d1ecf1; color: #0c5460; }
-        .message.warning { background-color: #fff3cd; color: #856404; }
-
-        /* Grid layout for utility sections */
         .utilities-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -112,7 +14,7 @@
         }
 
         .util-card {
-            background: white;
+            background: var(--on-background);
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             overflow: hidden;
@@ -160,12 +62,13 @@
         .setting-row:last-of-type { border-bottom: none; }
 
         .setting-label strong {
+            color: var(--body-text);
             display: block;
             font-size: 0.95rem;
         }
         .setting-label span {
             font-size: 0.82rem;
-            color: #888;
+            color: var(--body-text);
         }
 
         .toggle-switch {
@@ -205,7 +108,8 @@
         }
 
         .db-stat-item {
-            background: #f8f9fa;
+            background: var(--light);
+            border: solid 1px var(--gray);
             border-radius: 6px;
             padding: 0.75rem 1rem;
             text-align: center;
@@ -247,11 +151,14 @@
             width: 100%;
         }
         .file-drop .drop-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-        .file-drop .drop-label { font-size: 0.9rem; color: #666; }
+        .file-drop .drop-label { 
+            font-size: 0.9rem; 
+            color: var(--body-text);
+        }
         .file-drop .file-selected { font-size: 0.88rem; color: #28a745; font-weight: 600; margin-top: 0.4rem; }
 
         .preview-box {
-            background: #f8f9fa;
+            background: var(--on-background);
             border: 1px solid #dee2e6;
             border-radius: 6px;
             padding: 1rem;
@@ -260,7 +167,7 @@
         }
         .preview-box table { width: 100%; border-collapse: collapse; }
         .preview-box td { padding: 0.3rem 0.5rem; }
-        .preview-box td:first-child { color: #666; width: 55%; }
+        .preview-box td:first-child { color: var(--body-text); width: 55%; }
         .preview-box td:last-child { font-weight: 600; }
 
         .import-actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.75rem; }
@@ -273,8 +180,14 @@
             border-bottom: 1px solid #f0f0f0;
         }
         .export-row:last-child { border-bottom: none; }
-        .export-row .export-info strong { display: block; }
-        .export-row .export-info span { font-size: 0.82rem; color: #888; }
+        .export-row .export-info strong { 
+            display: block;
+            color: var(--body-text);
+         }
+        .export-row .export-info span { 
+            font-size: 0.82rem;
+            color: var(--body-text);
+        }
 
         /* Email test */
         .email-test-row {
@@ -405,7 +318,7 @@
                         <h2>Import Comments</h2>
                     </div>
                     <div class="util-card-body">
-                        <p>Import from a Disqus XML export or WordPress WXR file. Duplicate comments are skipped automatically.</p>
+                        <p>Import from a Disqus XML export or WordPress WXR file. Includes comment reactions and post reactions when present in the file. Duplicate comments are skipped automatically.</p>
                         <div class="file-drop" id="file-drop" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
                             <input type="file" id="import-file" accept=".xml" onchange="handleFileSelect(event)">
                             <div class="drop-icon">📂</div>
@@ -432,7 +345,7 @@
                         <div class="export-row">
                             <div class="export-info">
                                 <strong>Disqus XML</strong>
-                                <span>All approved &amp; pending comments in Disqus format</span>
+                                <span>Comments, comment reactions, and post reactions in Disqus-compatible XML</span>
                             </div>
                             <a href="api.php?action=export_disqus" class="btn btn-primary btn-sm" id="btn-export-disqus">Download</a>
                         </div>
@@ -758,6 +671,10 @@
                             <tr><td>Skipped (spam/deleted)</td><td>${d.posts_skip}</td></tr>
                             <tr><td>Duplicates (already exist)</td><td>${d.duplicates}</td></tr>
                             <tr><td>Orphaned (no thread match)</td><td>${d.orphaned}</td></tr>
+                            <tr><td>Comment reactions in file</td><td>${d.reactions_in_file ?? 0}</td></tr>
+                            <tr><td>Comment reactions to import</td><td><strong style="color:#28a745">${d.reactions_import ?? 0}</strong></td></tr>
+                            <tr><td>Post reactions in file</td><td>${d.post_reactions_in_file ?? 0}</td></tr>
+                            <tr><td>Post reactions to import</td><td><strong style="color:#28a745">${d.post_reactions_import ?? 0}</strong></td></tr>
                             <tr><td>Date range</td><td>${dateRange}</td></tr>
                         </table>
                         ${topRows ? `<hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #dee2e6;"><strong style="font-size:0.82rem;">Top pages</strong><table style="margin-top:0.4rem;">${topRows}</table>` : ''}
@@ -766,7 +683,10 @@
                 previewEl.style.display = 'block';
                 msgEl.innerHTML = '';
 
-                if (d.posts_import > 0) {
+                const canImport = (d.posts_import > 0)
+                    || ((d.reactions_import ?? 0) > 0)
+                    || ((d.post_reactions_import ?? 0) > 0);
+                if (canImport) {
                     document.getElementById('btn-import').disabled = false;
                     importPreviewDone = true;
                 } else {
@@ -783,7 +703,7 @@
 
         async function runImport() {
             if (!importFileContent || !importPreviewDone) return;
-            if (!confirm('Proceed with import? This will add comments to the database.')) return;
+            if (!confirm('Proceed with import? This will add comments and/or reactions to the database.')) return;
             const msgEl = document.getElementById('import-message');
             const statusEl = document.getElementById('import-status');
             await ensureCSRFToken();
@@ -799,7 +719,18 @@
                 const d = await r.json();
                 statusEl.textContent = '';
                 if (r.ok) {
-                    msgEl.innerHTML = `<div class="message success">Imported ${d.imported} comment${d.imported !== 1 ? 's' : ''} across ${d.unique_pages} page${d.unique_pages !== 1 ? 's' : ''}${d.skipped_duplicates > 0 ? ` (${d.skipped_duplicates} duplicates skipped)` : ''}.</div>`;
+                    const parts = [];
+                    if (d.imported > 0) {
+                        parts.push(`${d.imported} comment${d.imported !== 1 ? 's' : ''} across ${d.unique_pages} page${d.unique_pages !== 1 ? 's' : ''}`);
+                    }
+                    if ((d.reactions_imported ?? 0) > 0) {
+                        parts.push(`${d.reactions_imported} comment reaction${d.reactions_imported !== 1 ? 's' : ''}`);
+                    }
+                    if ((d.post_reactions_imported ?? 0) > 0) {
+                        parts.push(`${d.post_reactions_imported} post reaction${d.post_reactions_imported !== 1 ? 's' : ''}`);
+                    }
+                    const dupNote = d.skipped_duplicates > 0 ? ` (${d.skipped_duplicates} duplicate comments skipped)` : '';
+                    msgEl.innerHTML = `<div class="message success">Imported ${parts.length ? parts.join(', ') : 'no new items'}${dupNote}.</div>`;
                     document.getElementById('import-preview').style.display = 'none';
                     importFileContent = null;
                     importPreviewDone = false;

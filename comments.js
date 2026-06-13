@@ -132,6 +132,7 @@ class CommentSystem {
     renderPostReactionsSection(counts = {}) {
         const reactions = this.getReactionDefinitions();
         const usedReactions = reactions.filter(r => (counts[r.type] || 0) > 0);
+        const totalCount = Object.values(counts).reduce((sum, count) => sum + (parseInt(count) || 0), 0);
         const badgesHtml = usedReactions.map(r => {
             const count = counts[r.type] || 0;
             const voted = this.hasPostReacted(r.type);
@@ -145,7 +146,7 @@ class CommentSystem {
         }).join('');
 
         return `
-            <h4 class="post-reactions-label">بازخورد</h4>
+            <h4 class="post-reactions-label">${totalCount} بازخورد</h4>
             <div class="post-reactions-section">
                 <div class="reaction-picker-wrap" id="cs-post-reaction-picker-wrap">
                     <button type="button"
@@ -361,7 +362,18 @@ class CommentSystem {
                     <input type="text" name="website" placeholder="Website" class="form-input" tabindex="-1" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <textarea name="content" placeholder="متن *" required class="form-textarea" rows="4"></textarea>
+                    <div class="textarea-wrapper">
+                        <textarea name="content" placeholder="متن *" required class="form-textarea" rows="4"></textarea>
+                        <div class="help-icon">؟</div>
+                        <div class="tooltip">
+                            <p><strong>راهنمای فرمت‌دهی</strong></p>
+                            <p>بولد: **متن**</p>
+                            <p>ایتالیک: *متن*</p>
+                            <p>نقل قول: > متن</p>
+                            <p>هایپر لینک: [متن لینک](URL)</p>
+                            <p>نمایش تصویر: ![نام فایل](URL)</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
@@ -399,7 +411,7 @@ class CommentSystem {
         const submitBtn = form.querySelector('.btn-submit');
 
         submitBtn.disabled = true;
-        messageEl.textContent = 'Posting...';
+        messageEl.textContent = 'درحال ارسال...';
         messageEl.className = 'form-message info';
 
         const authorName = formData.get('author_name');
@@ -572,7 +584,7 @@ class CommentSystem {
             <div class="comment ${isPending ? 'comment-pending' : ''}" id="comment-${comment.id}" style="margin-right: ${depth * 30}px">
                 <div class="comment-meta">
                     <span class="comment-author">${authorLink}</span>
-                    <span class="comment-date">${formattedDate}</span>
+                    <a href="#comment-${comment.id}" class="comment-date">${formattedDate}</a>
                     ${pendingBadge}
                 </div>
                 <div class="comment-content">

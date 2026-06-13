@@ -124,6 +124,72 @@ function getAllowedReactionTypes() {
     return array_keys(getReactionDefinitions());
 }
 
+define('IFARD_EXPORT_NS', 'https://ifard.blog/ns/comments-export/1.0');
+
+function parseIfardVoteReactionNode($node) {
+    if ((string)$node->getName() !== 'reaction') {
+        return null;
+    }
+    $attrs = $node->attributes();
+    $type = (string)($attrs['type'] ?? '');
+    if ($type === '' || !in_array($type, getAllowedReactionTypes(), true)) {
+        return null;
+    }
+    $ip = (string)($attrs['ip'] ?? '');
+    if ($ip === '') {
+        return null;
+    }
+    $createdAt = (string)($attrs['createdAt'] ?? '');
+    $ts = $createdAt !== '' ? strtotime($createdAt) : false;
+    return [
+        'reaction_type' => $type,
+        'ip_address' => $ip,
+        'created_at' => date('Y-m-d H:i:s', $ts !== false ? $ts : time()),
+    ];
+}
+
+function parseCommentReactionsFromExportPost($post) {
+    $reactions = [];
+    $ifard = $post->children(IFARD_EXPORT_NS);
+    if (!isset($ifard->reactions)) {
+        return $reactions;
+    }
+    foreach ($ifard->reactions->children(IFARD_EXPORT_NS) as $node) {
+        $parsed = parseIfardVoteReactionNode($node);
+        if ($parsed) {
+            $reactions[] = $parsed;
+        }
+    }
+    return $reactions;
+}
+
+function parsePostReactionsFromExportXml($xml, $normUrl) {
+    $reactions = [];
+    $ifard = $xml->children(IFARD_EXPORT_NS);
+    if (!isset($ifard->postReactions)) {
+        return $reactions;
+    }
+    foreach ($ifard->postReactions->children(IFARD_EXPORT_NS) as $node) {
+        if ((string)$node->getName() !== 'reaction') {
+            continue;
+        }
+        $attrs = $node->attributes();
+        $pageUrl = (string)($attrs['pageUrl'] ?? '');
+        if ($pageUrl === '') {
+            continue;
+        }
+        if (strpos($pageUrl, 'http') === 0) {
+            $pageUrl = $normUrl($pageUrl);
+        }
+        $parsed = parseIfardVoteReactionNode($node);
+        if ($parsed) {
+            $parsed['page_url'] = $pageUrl;
+            $reactions[] = $parsed;
+        }
+    }
+    return $reactions;
+}
+
 function getReactionEmailLabel($reactionType) {
     $defs = getReactionDefinitions();
     return $defs[$reactionType]['label'] ?? $reactionType;
@@ -955,6 +1021,52 @@ if ($method === 'PUT' && $action === 'moderate') {
     jsonResponse(['success' => true, 'message' => 'Comment updated']);
 }
 
+// PUT /api.php?action=edit_content&id=... (admin)
+if ($method === 'PUT' && $action === 'edit_content') {
+    if (!isAdmin()) {
+        jsonResponse(['error' => 'Unauthorized'], 401);
+    }
+
+    $input = getInput();
+
+    $csrfToken = $input['csrf_token'] ?? '';
+    if (!validateCSRFToken($csrfToken)) {
+        jsonResponse(['error' => 'Invalid CSRF token'], 403);
+    }
+
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) {
+        jsonResponse(['error' => 'Invalid comment ID'], 400);
+    }
+
+    $content = trim($input['content'] ?? '');
+    if ($content === '') {
+        jsonResponse(['error' => 'Comment content is required'], 400);
+    }
+
+    $maxLength = 5000;
+    $maxStmt = $db->prepare("SELECT value FROM settings WHERE key = 'max_comment_length'");
+    $maxStmt->execute();
+    if ($maxRow = $maxStmt->fetch()) {
+        $maxLength = max(1, (int)$maxRow['value']);
+    }
+    if (strlen($content) > $maxLength) {
+        jsonResponse(['error' => 'Comment is too long'], 400);
+    }
+
+    $checkStmt = $db->prepare("SELECT id FROM comments WHERE id = ?");
+    $checkStmt->execute([$id]);
+    if (!$checkStmt->fetch()) {
+        jsonResponse(['error' => 'Comment not found'], 404);
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $stmt = $db->prepare("UPDATE comments SET content = ?, updated_at = ? WHERE id = ?");
+    $stmt->execute([$content, $now, $id]);
+
+    jsonResponse(['success' => true, 'message' => 'Comment updated', 'content' => $content]);
+}
+
 // DELETE /api.php?action=delete&id=...
 if ($method === 'DELETE' && $action === 'delete') {
     if (!isAdmin()) {
@@ -1295,6 +1407,24 @@ if ($method === 'GET' && $action === 'export_disqus') {
     ");
     $comments = $stmt->fetchAll();
 
+    $votesByCommentId = [];
+    $voteRows = $db->query("
+        SELECT v.comment_id, v.reaction_type, v.ip_address, v.created_at
+        FROM votes v
+        INNER JOIN comments c ON c.id = v.comment_id
+        WHERE c.status != 'spam'
+        ORDER BY v.comment_id, v.created_at
+    ")->fetchAll();
+    foreach ($voteRows as $row) {
+        $votesByCommentId[(int)$row['comment_id']][] = $row;
+    }
+
+    $postReactions = $db->query("
+        SELECT page_url, reaction_type, ip_address, created_at
+        FROM post_reactions
+        ORDER BY page_url, created_at
+    ")->fetchAll();
+
     header('Content-Type: application/xml; charset=utf-8');
     header('Content-Disposition: attachment; filename="disqus_export_' . date('Y-m-d') . '.xml"');
     header('Cache-Control: no-cache');
@@ -1323,6 +1453,7 @@ if ($method === 'GET' && $action === 'export_disqus') {
     echo '<disqus' . "\n";
     echo '  xmlns="http://disqus.com"' . "\n";
     echo '  xmlns:dsq="http://disqus.com/disqus-internals"' . "\n";
+    echo '  xmlns:ifard="' . IFARD_EXPORT_NS . '"' . "\n";
     echo '  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' . "\n";
     echo '  xsi:schemaLocation="http://disqus.com http://disqus.com/api/schemas/1.0/disqus.xsd">' . "\n\n";
 
@@ -1370,6 +1501,19 @@ if ($method === 'GET' && $action === 'export_disqus') {
         echo '      <isAnonymous>false</isAnonymous>' . "\n";
         echo '    </author>' . "\n";
         echo '    <message><![CDATA[' . $comment['content'] . ']]></message>' . "\n";
+        $commentVotes = $votesByCommentId[(int)$comment['id']] ?? [];
+        if (!empty($commentVotes)) {
+            echo '    <ifard:reactions>' . "\n";
+            foreach ($commentVotes as $vote) {
+                if (!in_array($vote['reaction_type'], getAllowedReactionTypes(), true)) {
+                    continue;
+                }
+                echo '      <ifard:reaction type="' . $e($vote['reaction_type']) . '"';
+                echo ' ip="' . $e($vote['ip_address']) . '"';
+                echo ' createdAt="' . $isoDate($vote['created_at']) . '"/>' . "\n";
+            }
+            echo '    </ifard:reactions>' . "\n";
+        }
         if ($comment['ip_address']) {
             echo '    <ipAddress>' . $e($comment['ip_address']) . '</ipAddress>' . "\n";
         }
@@ -1379,6 +1523,20 @@ if ($method === 'GET' && $action === 'export_disqus') {
         echo '    <isFlagged>false</isFlagged>' . "\n";
         echo '    <isSpam>' . $isSpam . '</isSpam>' . "\n";
         echo '  </post>' . "\n\n";
+    }
+
+    if (!empty($postReactions)) {
+        echo '  <ifard:postReactions>' . "\n";
+        foreach ($postReactions as $pr) {
+            if (!in_array($pr['reaction_type'], getAllowedReactionTypes(), true)) {
+                continue;
+            }
+            echo '    <ifard:reaction pageUrl="' . $e($pr['page_url']) . '"';
+            echo ' type="' . $e($pr['reaction_type']) . '"';
+            echo ' ip="' . $e($pr['ip_address']) . '"';
+            echo ' createdAt="' . $isoDate($pr['created_at']) . '"/>' . "\n";
+        }
+        echo '  </ifard:postReactions>' . "\n\n";
     }
 
     echo '</disqus>' . "\n";
@@ -1433,6 +1591,29 @@ if ($method === 'GET' && $action === 'post_reactions_summary') {
     $totalCount = array_sum(array_map(fn($p) => (int)($p['total'] ?? 0), $pages));
 
     jsonResponse(['pages' => $pages, 'total' => $totalCount]);
+}
+
+// GET /api.php?action=post_reactions_latest&limit=10 (admin)
+// Returns the latest post reactions with page URL, emoji, date, and IP
+if ($method === 'GET' && $action === 'post_reactions_latest') {
+    if (!isAdmin()) {
+        jsonResponse(['error' => 'Unauthorized'], 401);
+    }
+
+    $limit = (int)($_GET['limit'] ?? 10);
+    // Sanitize limit - max 100, min 1
+    $limit = max(1, min($limit, 100));
+
+    $stmt = $db->prepare("
+        SELECT id, page_url, reaction_type, created_at, ip_address
+        FROM post_reactions
+        ORDER BY created_at DESC
+        LIMIT ?
+    ");
+    $stmt->execute([$limit]);
+    $reactions = $stmt->fetchAll();
+
+    jsonResponse(['reactions' => $reactions]);
 }
 
 // GET /api.php?action=posts_summary (admin)
@@ -1643,6 +1824,33 @@ if ($method === 'DELETE' && $action === 'delete_post_reactions') {
     jsonResponse(['success' => true, 'message' => 'Post reactions cleared']);
 }
 
+// DELETE /api.php?action=delete_single_reaction&id=... (admin)
+// Deletes a single post reaction by ID
+if ($method === 'DELETE' && $action === 'delete_single_reaction') {
+    if (!isAdmin()) {
+        jsonResponse(['error' => 'Unauthorized'], 401);
+    }
+
+    $csrfToken = $_GET['csrf_token'] ?? '';
+    if (!validateCSRFToken($csrfToken)) {
+        jsonResponse(['error' => 'Invalid CSRF token'], 403);
+    }
+
+    $reactionId = $_GET['id'] ?? '';
+    if (empty($reactionId)) {
+        jsonResponse(['error' => 'id is required'], 400);
+    }
+
+    $stmt = $db->prepare("DELETE FROM post_reactions WHERE id = ?");
+    $result = $stmt->execute([$reactionId]);
+
+    if ($stmt->rowCount() > 0) {
+        jsonResponse(['success' => true, 'message' => 'Reaction deleted']);
+    } else {
+        jsonResponse(['error' => 'Reaction not found'], 404);
+    }
+}
+
 // POST /api.php?action=post_reaction
 // Toggle a reaction on the post itself (one per IP address per reaction type per page)
 if ($method === 'POST' && $action === 'post_reaction') {
@@ -1745,6 +1953,7 @@ if ($method === 'POST' && $action === 'import_disqus') {
     $skipped  = 0;
     $orphaned = 0;
     $rawPosts = [];
+    $rawPostReactions = [];
 
     if ($xml->getName() === 'rss') {
         // WordPress WXR format
@@ -1778,6 +1987,7 @@ if ($method === 'POST' && $action === 'import_disqus') {
                     'author_url'    => (string)$wp->comment_author_url   ?: null,
                     'content'       => $message,
                     'created_at'    => date('Y-m-d H:i:s', strtotime((string)$wp->comment_date_gmt)),
+                    'reactions'     => [],
                 ];
             }
         }
@@ -1812,8 +2022,11 @@ if ($method === 'POST' && $action === 'import_disqus') {
                 'author_url'    => (string)$post->author->link  ?: null,
                 'content'       => html_entity_decode(strip_tags((string)$post->message), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 'created_at'    => date('Y-m-d H:i:s', strtotime((string)$post->createdAt)),
+                'reactions'     => parseCommentReactionsFromExportPost($post),
             ];
         }
+
+        $rawPostReactions = parsePostReactionsFromExportXml($xml, $normUrl);
     }
 
     // Build a dedup set from existing comments: "created_at|page_url|author_name"
@@ -1831,6 +2044,31 @@ if ($method === 'POST' && $action === 'import_disqus') {
             $dupCount++;
         } else {
             $newPosts[] = $post;
+        }
+    }
+
+    $reactionsInFile = 0;
+    foreach ($rawPosts as $post) {
+        $reactionsInFile += count($post['reactions'] ?? []);
+    }
+    $reactionsToImport = 0;
+    foreach ($newPosts as $post) {
+        $reactionsToImport += count($post['reactions'] ?? []);
+    }
+
+    $existingPostReactionKeys = [];
+    $existingPostReactionRows = $db->query(
+        "SELECT page_url, ip_address, reaction_type FROM post_reactions"
+    )->fetchAll();
+    foreach ($existingPostReactionRows as $row) {
+        $existingPostReactionKeys[$row['page_url'] . '|' . $row['ip_address'] . '|' . $row['reaction_type']] = true;
+    }
+    $postReactionsInFile = count($rawPostReactions);
+    $postReactionsToImport = 0;
+    foreach ($rawPostReactions as $pr) {
+        $prKey = $pr['page_url'] . '|' . $pr['ip_address'] . '|' . $pr['reaction_type'];
+        if (!isset($existingPostReactionKeys[$prKey])) {
+            $postReactionsToImport++;
         }
     }
 
@@ -1853,16 +2091,20 @@ if ($method === 'POST' && $action === 'import_disqus') {
         if ($dupCount > 0)         $warnings[] = "$dupCount duplicate(s) already in database — will be skipped.";
 
         jsonResponse([
-            'preview'      => true,
-            'threads'      => count($threads),
-            'posts_total'  => $rawTotal,
-            'posts_import' => count($newPosts),
-            'posts_skip'   => $skipped,
-            'duplicates'   => $dupCount,
-            'orphaned'     => $orphaned,
-            'date_range'   => $dateRange,
-            'top_threads'  => $topThreads,
-            'warnings'     => $warnings,
+            'preview'               => true,
+            'threads'               => count($threads),
+            'posts_total'           => $rawTotal,
+            'posts_import'          => count($newPosts),
+            'posts_skip'            => $skipped,
+            'duplicates'            => $dupCount,
+            'orphaned'              => $orphaned,
+            'reactions_in_file'     => $reactionsInFile,
+            'reactions_import'      => $reactionsToImport,
+            'post_reactions_in_file'=> $postReactionsInFile,
+            'post_reactions_import' => $postReactionsToImport,
+            'date_range'            => $dateRange,
+            'top_threads'           => $topThreads,
+            'warnings'              => $warnings,
         ]);
     }
 
@@ -1871,6 +2113,8 @@ if ($method === 'POST' && $action === 'import_disqus') {
 
     $postIdMap = [];
     $imported  = 0;
+    $reactionsImported = 0;
+    $postReactionsImported = 0;
 
     $db->beginTransaction();
     try {
@@ -1878,6 +2122,14 @@ if ($method === 'POST' && $action === 'import_disqus') {
             INSERT INTO comments (page_url, parent_id, author_name, author_email, author_url,
                                   content, created_at, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')
+        ");
+        $voteStmt = $db->prepare("
+            INSERT OR IGNORE INTO votes (comment_id, ip_address, reaction_type, created_at)
+            VALUES (?, ?, ?, ?)
+        ");
+        $postReactionStmt = $db->prepare("
+            INSERT OR IGNORE INTO post_reactions (page_url, ip_address, reaction_type, created_at)
+            VALUES (?, ?, ?, ?)
         ");
 
         foreach ($newPosts as $post) {
@@ -1893,8 +2145,33 @@ if ($method === 'POST' && $action === 'import_disqus') {
                 $post['created_at'],
             ]);
 
-            $postIdMap[$post['dsq_id']] = $db->lastInsertId();
+            $newCommentId = (int)$db->lastInsertId();
+            $postIdMap[$post['dsq_id']] = $newCommentId;
             $imported++;
+
+            foreach ($post['reactions'] ?? [] as $reaction) {
+                $voteStmt->execute([
+                    $newCommentId,
+                    $reaction['ip_address'],
+                    $reaction['reaction_type'],
+                    $reaction['created_at'],
+                ]);
+                if ($voteStmt->rowCount() > 0) {
+                    $reactionsImported++;
+                }
+            }
+        }
+
+        foreach ($rawPostReactions as $pr) {
+            $postReactionStmt->execute([
+                $pr['page_url'],
+                $pr['ip_address'],
+                $pr['reaction_type'],
+                $pr['created_at'],
+            ]);
+            if ($postReactionStmt->rowCount() > 0) {
+                $postReactionsImported++;
+            }
         }
 
         $db->commit();
@@ -1905,10 +2182,12 @@ if ($method === 'POST' && $action === 'import_disqus') {
 
     $uniquePages = count(array_unique(array_column($newPosts, 'page_url')));
     jsonResponse([
-        'success'           => true,
-        'imported'          => $imported,
-        'unique_pages'      => $uniquePages,
-        'skipped_duplicates'=> $dupCount,
+        'success'                => true,
+        'imported'               => $imported,
+        'unique_pages'           => $uniquePages,
+        'skipped_duplicates'     => $dupCount,
+        'reactions_imported'     => $reactionsImported,
+        'post_reactions_imported'=> $postReactionsImported,
     ]);
 }
 

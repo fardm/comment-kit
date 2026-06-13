@@ -1,124 +1,39 @@
-/**
- * Standalone Comment System - Styles
- */
-
- .comments-system {
-    /* CSS Variables for easy theming and adaptation */
-    --cs-font-family: inherit;
-    --cs-text-color: inherit;
-    --cs-heading-color: inherit;
-    --cs-link-color: #4a90e2;
-
-    --cs-form-bg: rgba(0, 0, 0, 0.03);
-    --cs-form-padding: 1.5rem;
-    --cs-form-radius: 8px;
-    --cs-form-border: 1px solid rgba(0, 0, 0, 0.05);
-
-    --cs-input-bg: #ffffff;
-    --cs-input-border: #dddddd;
-    --cs-input-text: #333333;
-    --cs-input-focus-border: #4a90e2;
-    --cs-input-focus-shadow: rgba(74, 144, 226, 0.1);
-
-    /* Button Colors - High Contrast Defaults */
-    --cs-btn-submit-bg: #2563eb;
-    --cs-btn-submit-text: #ffffff;
-    --cs-btn-submit-hover: #1d4ed8;
-    --cs-btn-submit-border: #2563eb;
-
-    --cs-btn-cancel-bg: #f3f4f6;
-    --cs-btn-cancel-text: #374151;
-    --cs-btn-cancel-hover: #e5e7eb;
-    --cs-btn-cancel-border: #d1d5db;
-
-    --cs-btn-reply-color: #4a90e2;
-    --cs-btn-reply-border: #dddddd;
-    --cs-btn-reply-hover-bg: rgba(0, 0, 0, 0.05);
-
-    --cs-btn-reaction-color: #888888;
-    --cs-btn-reaction-border: #dddddd;
-    --cs-btn-reaction-hover-bg: rgba(0, 0, 0, 0.04);
-    --cs-reaction-heart-color: #e05a6a;
-    --cs-reaction-thumbsup-color: #4a90e2;
-    --cs-reaction-lightbulb-color: #f59e0b;
-    --cs-reaction-funny-color: #10b981;
-
-    /* Reaction picker (popover) */
-    --cs-popover-bg: #ffffff;
-    --cs-popover-border: rgba(0, 0, 0, 0.08);
-    --cs-popover-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
-    --cs-popover-btn-hover-bg: rgba(0, 0, 0, 0.05);
-
+.comments-system {
     --cs-message-success-bg: #d4edda;
     --cs-message-success-text: #155724;
     --cs-message-error-bg: #f8d7da;
-    --cs-message-error-text: #721c24;
     --cs-message-info-bg: #d1ecf1;
     --cs-message-info-text: #0c5460;
-
-    --cs-comment-bg: #ffffff;
-    --cs-comment-border: #e0e0e0;
-    --cs-comment-shadow-hover: rgba(0, 0, 0, 0.05);
-    --cs-comment-meta-color: #393939;
-
     --cs-pending-bg: #fffbf0;
     --cs-pending-badge-bg: #ffc107;
     --cs-pending-badge-text: #333333;
 
-    /* max-width: 800px; */
-    margin: 2rem auto;
-    font-family: var(--cs-font-family);
-    color: var(--cs-text-color);
-    line-height: 1.6;
+    --btn-brightness: brightness(94%);
+    /* برای من توی کاستوم تعریف شده */
+    /* --on-background: #f9e8d6; */
+    /* --secondary-shadow: #ee5a2512; */ 
+
 }
 
-/* Manual Dark Mode Class Support */
-.dark-mode .comments-system,
-[saved-theme="dark"] .comments-system {
-    --cs-link-color: #60a5fa;
-    --cs-form-bg: rgba(255, 255, 255, 0.05);
-    --cs-form-border: 1px solid rgba(255, 255, 255, 0.1);
-    --cs-input-bg: #1f2937;
-    --cs-input-border: #374151;
-    --cs-input-text: #f3f4f6;
-    --cs-input-focus-border: #60a5fa;
-    --cs-input-focus-shadow: rgba(96, 165, 250, 0.2);
-    --cs-btn-submit-bg: #3b82f6;
-    --cs-btn-submit-text: #ffffff;
-    --cs-btn-submit-hover: #2563eb;
-    --cs-btn-submit-border: #3b82f6;
-    --cs-btn-cancel-bg: #374151;
-    --cs-btn-cancel-text: #f3f4f6;
-    --cs-btn-cancel-hover: #4b5563;
-    --cs-btn-cancel-border: #4b5563;
-    --cs-btn-reply-color: #60a5fa;
-    --cs-btn-reply-border: #374151;
-    --cs-btn-reply-hover-bg: rgba(255, 255, 255, 0.05);
-    --cs-btn-reaction-color: #6b7280;
-    --cs-btn-reaction-border: #374151;
-    --cs-btn-reaction-hover-bg: rgba(255, 255, 255, 0.05);
-    --cs-reaction-heart-color: #f87171;
-    --cs-reaction-thumbsup-color: #60a5fa;
-    --cs-reaction-lightbulb-color: #fbbf24;
-    --cs-reaction-funny-color: #34d399;
-
-    --cs-popover-bg: #111827;
-    --cs-popover-border: rgba(255, 255, 255, 0.12);
-    --cs-popover-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-    --cs-popover-btn-hover-bg: rgba(255, 255, 255, 0.07);
+ [saved-theme="dark"] .comments-system {
     --cs-message-success-bg: rgba(21, 87, 36, 0.4);
     --cs-message-success-text: #e2e3e5;
     --cs-message-error-bg: rgba(114, 28, 36, 0.4);
-    --cs-message-error-text: #e2e3e5;
     --cs-message-info-bg: rgba(12, 84, 96, 0.4);
     --cs-message-info-text: #e2e3e5;
-    --cs-comment-bg: #1f2937;
-    --cs-comment-border: #374151;
-    --cs-comment-shadow-hover: rgba(0, 0, 0, 0.2);
-    --cs-comment-meta-color: #9ca3af;
     --cs-pending-bg: rgba(255, 193, 7, 0.15);
     --cs-pending-badge-bg: #ffc107;
     --cs-pending-badge-text: #000000;
+
+    --btn-brightness: brightness(110%);
+    /* --on-background: #1f1f22; */
+    /* --secondary-shadow: #ee5a2512; */
+
+}
+
+.comments-system {
+    margin: 2rem auto;
+    color: var(--btn-brightness)
 }
 
 /* Post Reactions Section */
@@ -129,37 +44,12 @@
     gap: 0.75rem;
     margin-top: 1rem;
     margin-bottom: 2rem;
-    /* padding: 0.75rem 1rem;
-    background: var(--cs-form-bg);
-    border: var(--cs-form-border);
-    border-radius: var(--cs-form-radius); */
     flex-wrap: wrap;
 }
 
 .comments-system .post-reactions-label {
-    color: var(--cs-comment-meta-color);
+    color: var(--darkgray);
     text-align: center;
-}
-
-.comments-title {
-    font-size: 1.4rem;
-    color: var(--cs-heading-color);
-}
-
-/* Comment Form */
-.comments-system .comment-form {
-    /* background: var(--cs-form-bg); */
-    /* padding: var(--cs-form-padding); */
-    /* border-radius: var(--cs-form-radius);
-    border: var(--cs-form-border);
-    margin-bottom: 2rem; */
-}
-
-.comments-system .comment-form h4 {
-    margin-top: 0;
-    margin-bottom: 1rem;
-    color: var(--cs-heading-color);
-    opacity: 0.9;
 }
 
 .comments-system .form-group {
@@ -173,13 +63,14 @@
 .comments-system .form-textarea {
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid var(--cs-input-border);
+    border: 1px solid var(--lightgray);
     border-radius: 4px;
     font-size: 1rem;
     font-family: inherit;
     box-sizing: border-box;
-    background-color: var(--cs-input-bg);
-    color: var(--cs-input-text);
+    background: var(--on-background);
+    filter: var(--btn-brightness);
+    color: var(--dark);
     transition: border-color 0.2s, box-shadow 0.2s;
     appearance: none;
 }
@@ -187,8 +78,8 @@
 .comments-system .form-input:focus,
 .comments-system .form-textarea:focus {
     outline: none;
-    border-color: var(--cs-input-focus-border);
-    box-shadow: 0 0 0 3px var(--cs-input-focus-shadow);
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 3px var(--secondary-shadow);
 }
 
 .comments-system .form-textarea {
@@ -198,19 +89,17 @@
 
 .comments-system .checkbox-label {
     display: flex;
-    /* align-items: center; */
     gap: 0.5rem;
     cursor: pointer;
     font-size: 0.9rem;
-    color: var(--cs-text-color);
+    color: var(--darkgray);
     opacity: 0.9;
     background: transparent !important;
 }
 
 .comments-system .checkbox-label input[type="checkbox"] {
-    /* width: auto; */
     cursor: pointer;
-    accent-color: var(--cs-btn-submit-bg);
+    accent-color: var(--secondary);
     margin: 0;
 }
 
@@ -246,19 +135,14 @@
 
 /* Submit Button - The Fix */
 #comments-container .comments-system button.btn-submit {
-    background: var(--cs-btn-submit-bg) !important;
-    background-color: var(--cs-btn-submit-bg) !important;
-    color: var(--cs-btn-submit-text) !important;
-    border: 1px solid var(--cs-btn-submit-border) !important;
+    background: var(--secondary) !important;
+    color: var(--light) !important;
+    border: none;
     opacity: 1 !important;
 }
 
 #comments-container .comments-system button.btn-submit:hover {
-    background: var(--cs-btn-submit-hover) !important;
-    background-color: var(--cs-btn-submit-hover) !important;
-    border-color: var(--cs-btn-submit-hover) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    filter: var(--btn-brightness) !important;
 }
 
 #comments-container .comments-system button.btn-submit:disabled {
@@ -269,26 +153,25 @@
 }
 
 #comments-container .comments-system button.btn-cancel {
-    background: var(--cs-btn-cancel-bg) !important;
-    background-color: var(--cs-btn-cancel-bg) !important;
-    color: var(--cs-btn-cancel-text) !important;
-    border: 1px solid var(--cs-btn-cancel-border) !important;
+    background: var(--gray) !important;
+    color: var(--darkgray) !important;
+    border: none;
 }
 
 #comments-container .comments-system button.btn-cancel:hover {
-    background-color: var(--cs-btn-cancel-hover) !important;
+    filter: var(--btn-brightness) !important;
 }
 
 #comments-container .comments-system button.btn-reply {
-    background: transparent !important;
-    border: 1px solid var(--cs-btn-reply-border) !important;
-    color: var(--cs-btn-reply-color) !important;
+    background: var(--on-background) !important;
+    border: 1px solid var(--lightgray) !important;
+    color: var(--darkgray) !important;
     padding: 0.2rem 0.6rem;
     font-size: 0.85rem;
 }
 
 #comments-container .comments-system button.btn-reply:hover {
-    background-color: var(--cs-btn-reply-hover-bg) !important;
+    filter: var(--btn-brightness) !important;
 }
 
 .comments-system .reactions-bar {
@@ -324,8 +207,8 @@
 
 #comments-container .comments-system .btn-reaction-add {
     background: transparent !important;
-    border: 1px solid var(--cs-btn-reaction-border) !important;
-    color: var(--cs-btn-reaction-color) !important;
+    border: 1px solid var(--lightgray);
+    color: var(--gray);
     padding: 0.5rem !important;
     font-size: 1.1rem !important;
     line-height: 1 !important;
@@ -336,7 +219,7 @@
 }
 
 #comments-container .comments-system .btn-reaction-add:hover {
-    background: var(--cs-btn-reaction-hover-bg) !important;
+    filter: var(--btn-brightness)
 }
 
 #comments-container .comments-system .btn-reaction-add:active {
@@ -348,16 +231,14 @@
     z-index: 50;
     top: calc(100% + 6px);
     left: 0;
-
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
-
     padding: 0.35rem;
-    background: var(--cs-popover-bg);
-    border: 1px solid var(--cs-popover-border);
+    background: var(--on-background);
+    border: 1px solid var(--lightgray);
     border-radius: 12px;
-    box-shadow: var(--cs-popover-shadow);
+    box-shadow: var(--secondary-shadow);
 
     min-width: 210px;
 
@@ -387,7 +268,7 @@
 }
 
 .comments-system .reaction-picker-emoji:hover {
-    background: var(--cs-popover-btn-hover-bg);
+    background: var(--lightgray);
     transform: translateY(-1px);
 }
 
@@ -401,9 +282,9 @@
 }
 
 #comments-container .comments-system button.btn-reaction {
-    background: transparent !important;
-    border: 1px solid var(--cs-btn-reaction-border) !important;
-    color: var(--cs-btn-reaction-color) !important;
+    background: var(--on-background);
+    border: 1px solid var(--lightgray);
+    color: var(--gray);
     padding: 0.3rem 0.4rem;
     font-size: 1rem;
     display: inline-flex;
@@ -414,7 +295,8 @@
 }
 
 #comments-container .comments-system button.btn-reaction:hover {
-    background: var(--cs-btn-reaction-hover-bg) !important;
+    filter: var(--btn-brightness);
+    cursor: pointer;
 }
 
 #comments-container .comments-system button.btn-reaction:active {
@@ -426,47 +308,27 @@
     cursor: default;
 }
 
-#comments-container .comments-system button.btn-reaction-heart.voted {
-    color: var(--cs-reaction-heart-color) !important;
-    border-color: var(--cs-reaction-heart-color) !important;
-}
-
-#comments-container .comments-system button.btn-reaction-thumbsup.voted {
-    color: var(--cs-reaction-thumbsup-color) !important;
-    border-color: var(--cs-reaction-thumbsup-color) !important;
-}
-
-#comments-container .comments-system button.btn-reaction-lightbulb.voted {
-    color: var(--cs-reaction-lightbulb-color) !important;
-    border-color: var(--cs-reaction-lightbulb-color) !important;
-}
 
 #comments-container .comments-system button.btn-reaction-funny.voted {
-    color: var(--cs-reaction-funny-color) !important;
-    border-color: var(--cs-reaction-funny-color) !important;
+    color: var(--secondary) !important;
+    border-color: var(--secondary) !important;
+    filter: var(--btn-brightness);
 }
 
 #comments-container .comments-system button.btn-reaction.voted {
     /* Fallback styling for new reaction types */
-    color: var(--cs-link-color) !important;
-    border-color: var(--cs-link-color) !important;
-    background: rgba(74, 144, 226, 0.08) !important;
+    color: var(--secondary) !important;
+    border-color: var(--secondary) !important;
+    background: var(--secondary-shadow) !important;
 }
+
+
 
 .comments-system .reaction-emoji {
     font-style: normal;
     line-height: 1;
-    /* filter: grayscale(1) opacity(0.55); */
     transition: filter 0.2s;
 }
-
-/* .comments-system button.btn-reaction.voted .reaction-emoji {
-    filter: none;
-} */
-
-/* .comments-system button.btn-reaction:hover .reaction-emoji {
-    filter: grayscale(0.2) opacity(0.85);
-} */
 
 .comments-system .reaction-count {
     font-size: 0.82rem;
@@ -504,17 +366,14 @@
 }
 
 .comments-system .comment {
-    background: var(--cs-comment-bg);
-    border: 1px solid var(--cs-comment-border);
+    background: var(--on-background);
+    border: 1px solid var(--lightgray);
     border-radius: 6px;
     padding: 1.25rem;
     margin-bottom: 1rem;
     transition: box-shadow 0.2s;
 }
 
-.comments-system .comment:hover {
-    box-shadow: 0 2px 8px var(--cs-comment-shadow-hover);
-}
 
 .comments-system .comment-pending {
     opacity: 0.9;
@@ -526,26 +385,15 @@
     align-items: center;
     gap: 1rem;
     margin-bottom: 0.75rem;
-    font-size: 0.9rem;
     flex-wrap: wrap;
+    border-bottom: solid 1px var(--lightgray);
+    padding-bottom: 10px;
 }
 
-.comments-system .comment-author {
-    font-weight: 600;
-    color: var(--cs-heading-color);
-}
-
-.comments-system .comment-author a {
-    color: var(--cs-link-color);
-    text-decoration: none;
-}
-
-.comments-system .comment-author a:hover {
-    text-decoration: underline;
-}
 
 .comments-system .comment-date {
-    color: var(--cs-comment-meta-color);
+    font-size: 0.9rem;
+    font-weight: 400;
 }
 
 .comments-system .badge-pending {
@@ -559,13 +407,8 @@
 
 .comments-system .comment-content {
     margin-bottom: 0.75rem;
-    color: var(--cs-text-color);
+    color: var(--darkgray);
     line-height: 1.6;
-}
-
-.comments-system .comment-content a {
-    color: var(--cs-link-color, #4a90e2);
-    word-break: break-all;
 }
 
 .comments-system .comment-content code {
@@ -577,10 +420,8 @@
 }
 
 .comments-system .comment-content blockquote {
-    border-left: 3px solid var(--cs-blockquote-border, #ccc);
     margin: 0.25rem 0;
     padding: 0.1rem 0.75rem;
-    color: var(--cs-comment-meta-color);
     font-style: italic;
 }
 
@@ -595,18 +436,21 @@
         background: rgba(255, 255, 255, 0.1);
     }
 
-    .comments-system .comment-content blockquote {
-        border-left-color: #555;
-    }
+
 }
 
 .comments-system .comment-actions {
     display: flex;
     gap: 0.5rem;
+    justify-content: flex-end;
 }
 
 .comments-system .comment-reply-form {
     margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+.comments-system .comment-reply-form h4 {
     margin-bottom: 1rem;
 }
 
@@ -617,7 +461,7 @@
 .comments-system .error {
     text-align: center;
     padding: 2rem;
-    color: var(--cs-comment-meta-color);
+    color: var(--gray);
     font-style: italic;
 }
 
@@ -634,7 +478,6 @@
     .comments-system .comment {
         margin-left: 0 !important;
         padding-left: 1rem;
-        border-left: 3px solid var(--cs-comment-border);
     }
 
     .comments-system .comment-form {
@@ -653,7 +496,6 @@
 
 
 /* custom */
-
 .befor-form-comment {
     margin-bottom: 0
 }
@@ -671,3 +513,71 @@
     border-bottom: solid 1px var(--lightgray);
     margin-bottom: 2rem;
 }
+
+
+/* راهنمای فرمت‌دهی */
+.comment-form .form-group {
+    position: relative;
+}
+
+.textarea-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.form-textarea {
+    width: 100%;
+    padding-top: 40px; 
+    padding-right: 40px; 
+    box-sizing: border-box;
+}
+
+.help-icon {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 20px;
+    height: 20px;
+    padding: 0.1rem;
+    background-color: var(--lightgray);
+    color: var(--darkgray);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer; 
+    z-index: 10; 
+}
+
+.tooltip {
+    position: absolute;
+    top: 40px; 
+    left: 10px; 
+    background-color: var(--lightgray);
+    color: var(--darkgray);
+    padding: 10px;
+    border-radius: 5px;
+    white-space: nowrap; 
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 100;
+    min-width: 200px; 
+    text-align: right;
+    font-size: 0.8rem;
+}
+
+.tooltip p {
+    line-height: 0.9rem;
+}
+
+.help-icon:hover + .tooltip,
+.tooltip:hover {
+    visibility: visible;
+    opacity: 1;
+}
+
+
