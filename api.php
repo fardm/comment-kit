@@ -40,6 +40,22 @@ if (!defined('ALLOWED_ORIGINS')) {
     define('ALLOWED_ORIGINS', ['*']);
 }
 
+// Ensure APP_URL is defined based on server variables if omitted from config
+if (!defined('APP_URL')) {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $dir = dirname($_SERVER['SCRIPT_NAME']);
+    // Replace backslashes for Windows paths and trim trailing slashes
+    $dir = rtrim(str_replace('\\', '/', $dir), '/');
+    define('APP_URL', $scheme . '://' . $host . $dir);
+}
+
+// Generate the cookie path dynamically based on APP_URL
+if (!defined('APP_PATH')) {
+    $parsedPath = parse_url(APP_URL, PHP_URL_PATH);
+    define('APP_PATH', $parsedPath ?: '/');
+}
+
 // Set timezone if not already set
 if (!ini_get('date.timezone')) {
     date_default_timezone_set('UTC');
@@ -124,9 +140,9 @@ function getAllowedReactionTypes() {
     return array_keys(getReactionDefinitions());
 }
 
-define('IFARD_EXPORT_NS', 'https://ifard.blog/ns/comments-export/1.0');
+define('CUSTOM_REACTION_NS', 'https://example.com/ns/comments-export/1.0');
 
-function parseIfardVoteReactionNode($node) {
+function parseCustomVoteReactionNode($node) {
     if ((string)$node->getName() !== 'reaction') {
         return null;
     }
@@ -150,12 +166,12 @@ function parseIfardVoteReactionNode($node) {
 
 function parseCommentReactionsFromExportPost($post) {
     $reactions = [];
-    $ifard = $post->children(IFARD_EXPORT_NS);
-    if (!isset($ifard->reactions)) {
+    $custom = $post->children(CUSTOM_REACTION_NS);
+    if (!isset($custom->reactions)) {
         return $reactions;
     }
-    foreach ($ifard->reactions->children(IFARD_EXPORT_NS) as $node) {
-        $parsed = parseIfardVoteReactionNode($node);
+    foreach ($custom->reactions->children(CUSTOM_REACTION_NS) as $node) {
+        $parsed = parseCustomVoteReactionNode($node);
         if ($parsed) {
             $reactions[] = $parsed;
         }
@@ -165,11 +181,11 @@ function parseCommentReactionsFromExportPost($post) {
 
 function parsePostReactionsFromExportXml($xml, $normUrl) {
     $reactions = [];
-    $ifard = $xml->children(IFARD_EXPORT_NS);
-    if (!isset($ifard->postReactions)) {
+    $custom = $xml->children(CUSTOM_REACTION_NS);
+    if (!isset($custom->postReactions)) {
         return $reactions;
     }
-    foreach ($ifard->postReactions->children(IFARD_EXPORT_NS) as $node) {
+    foreach ($custom->postReactions->children(CUSTOM_REACTION_NS) as $node) {
         if ((string)$node->getName() !== 'reaction') {
             continue;
         }
@@ -181,7 +197,7 @@ function parsePostReactionsFromExportXml($xml, $normUrl) {
         if (strpos($pageUrl, 'http') === 0) {
             $pageUrl = $normUrl($pageUrl);
         }
-        $parsed = parseIfardVoteReactionNode($node);
+        $parsed = parseCustomVoteReactionNode($node);
         if ($parsed) {
             $parsed['page_url'] = $pageUrl;
             $reactions[] = $parsed;
@@ -268,7 +284,7 @@ function generateCSRFToken() {
     if (!isset($_COOKIE['csrf_token'])) {
         $token = bin2hex(random_bytes(32));
         $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
-        setcookie('csrf_token', $token, time() + SESSION_LIFETIME, '/comments/', '', $isSecure, false); // Not HTTPOnly - JS needs to read it
+        setcookie('csrf_token', $token, time() + SESSION_LIFETIME, APP_PATH, '', $isSecure, false); // Not HTTPOnly - JS needs to read it
         return $token;
     }
     return $_COOKIE['csrf_token'];
@@ -451,7 +467,7 @@ function sendNotificationEmail($commentId, $pageUrl, $parentId, $authorName, $co
             $stmt = $db->prepare("SELECT token FROM subscriptions WHERE page_url = ? AND email = ?");
             $stmt->execute([$pageUrl, $parent['author_email']]);
             $subData = $stmt->fetch();
-            $unsubscribeUrl = $subData ? "https://" . $_SERVER['HTTP_HOST'] . "/comments/unsubscribe.php?token=" . $subData['token'] : "";
+            $unsubscribeUrl = $subData ? APP_URL . "/unsubscribe.php?token=" . $subData['token'] : "";
 
             $subject = "New reply to your comment";
             $message = "Hello {$safeParentName},\n\n";
@@ -486,7 +502,7 @@ function sendNotificationEmail($commentId, $pageUrl, $parentId, $authorName, $co
             continue;
         }
 
-        $unsubscribeUrl = "https://" . $_SERVER['HTTP_HOST'] . "/comments/unsubscribe.php?token=" . $subscriber['token'];
+        $unsubscribeUrl = APP_URL . "/unsubscribe.php?token=" . $subscriber['token'];
 
         $subject = "New comment on " . parse_url($pageUrl, PHP_URL_PATH);
         $message = "Hello,\n\n";
@@ -509,7 +525,7 @@ function sendNotificationEmail($commentId, $pageUrl, $parentId, $authorName, $co
         $subject = "New comment on your site";
         $message = "New comment from {$safeAuthorName} on {$safePageUrl}:\n\n";
         $message .= "{$safeContent}\n\n";
-        $message .= "Manage comments: https://" . $_SERVER['HTTP_HOST'] . "/comments/admin.html\n";
+        $message .= "Manage comments: " . APP_URL . "/admin.html\n";
 
         // Queue admin email instead of sending immediately
         queueEmail($commentId, $result['value'], 'Admin', 'admin', $subject, $message);
@@ -541,7 +557,7 @@ function sendPostReactionNotificationEmail($pageUrl, $reactionType) {
 
     $subject = "New post reaction on your site";
     $message = "Someone left a {$reactionLabel} reaction on {$safePageUrl}.\n\n";
-    $message .= "View post reactions: https://" . $_SERVER['HTTP_HOST'] . "/comments/admin-post-reactions.html\n";
+    $message .= "View post reactions: " . APP_URL . "/admin-post-reactions.html\n";
 
     queueEmail(null, $adminEmail, 'Admin', 'post_reaction', $subject, $message);
 }
@@ -571,7 +587,7 @@ function sendReactionNotificationEmail($commentId, $pageUrl, $authorName, $autho
     $stmt = $db->prepare("SELECT token FROM subscriptions WHERE page_url = ? AND email = ?");
     $stmt->execute([$pageUrl, $authorEmail]);
     $subData = $stmt->fetch();
-    $unsubscribeUrl = $subData ? "https://" . $_SERVER['HTTP_HOST'] . "/comments/unsubscribe.php?token=" . $subData['token'] : "";
+    $unsubscribeUrl = $subData ? APP_URL . "/unsubscribe.php?token=" . $subData['token'] : "";
 
     $subject = "Someone reacted to your comment";
     $message = "Hello {$safeAuthorName},\n\n";
@@ -960,9 +976,9 @@ if ($method === 'POST' && $action === 'login') {
         $stmt = $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_token', ?)");
         $stmt->execute([$token]);
 
-        // Set secure cookie (HTTPS only in production)
+        // Set secure cookie (HTTPS only in production) using APP_PATH
         $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
-        setcookie(ADMIN_TOKEN_COOKIE, $token, time() + SESSION_LIFETIME, '/comments/', '', $isSecure, true);
+        setcookie(ADMIN_TOKEN_COOKIE, $token, time() + SESSION_LIFETIME, APP_PATH, '', $isSecure, true);
 
         // Generate CSRF token for this session
         $csrfToken = generateCSRFToken();
@@ -987,10 +1003,10 @@ if ($method === 'POST' && $action === 'logout') {
         $stmt = $db->prepare("DELETE FROM settings WHERE key = 'admin_token' AND value = ?");
         $stmt->execute([$token]);
     }
-    // Expire the cookie
+    // Expire the cookie using APP_PATH
     $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
-    setcookie(ADMIN_TOKEN_COOKIE, '', time() - 3600, '/comments/', '', $isSecure, true);
-    setcookie('csrf_token', '', time() - 3600, '/comments/', '', $isSecure, false);
+    setcookie(ADMIN_TOKEN_COOKIE, '', time() - 3600, APP_PATH, '', $isSecure, true);
+    setcookie('csrf_token', '', time() - 3600, APP_PATH, '', $isSecure, false);
     jsonResponse(['success' => true]);
 }
 
@@ -1453,7 +1469,7 @@ if ($method === 'GET' && $action === 'export_disqus') {
     echo '<disqus' . "\n";
     echo '  xmlns="http://disqus.com"' . "\n";
     echo '  xmlns:dsq="http://disqus.com/disqus-internals"' . "\n";
-    echo '  xmlns:ifard="' . IFARD_EXPORT_NS . '"' . "\n";
+    echo '  xmlns:custom="' . CUSTOM_REACTION_NS . '"' . "\n";
     echo '  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' . "\n";
     echo '  xsi:schemaLocation="http://disqus.com http://disqus.com/api/schemas/1.0/disqus.xsd">' . "\n\n";
 
@@ -1503,16 +1519,16 @@ if ($method === 'GET' && $action === 'export_disqus') {
         echo '    <message><![CDATA[' . $comment['content'] . ']]></message>' . "\n";
         $commentVotes = $votesByCommentId[(int)$comment['id']] ?? [];
         if (!empty($commentVotes)) {
-            echo '    <ifard:reactions>' . "\n";
+            echo '    <custom:reactions>' . "\n";
             foreach ($commentVotes as $vote) {
                 if (!in_array($vote['reaction_type'], getAllowedReactionTypes(), true)) {
                     continue;
                 }
-                echo '      <ifard:reaction type="' . $e($vote['reaction_type']) . '"';
+                echo '      <custom:reaction type="' . $e($vote['reaction_type']) . '"';
                 echo ' ip="' . $e($vote['ip_address']) . '"';
                 echo ' createdAt="' . $isoDate($vote['created_at']) . '"/>' . "\n";
             }
-            echo '    </ifard:reactions>' . "\n";
+            echo '    </custom:reactions>' . "\n";
         }
         if ($comment['ip_address']) {
             echo '    <ipAddress>' . $e($comment['ip_address']) . '</ipAddress>' . "\n";
@@ -1526,17 +1542,17 @@ if ($method === 'GET' && $action === 'export_disqus') {
     }
 
     if (!empty($postReactions)) {
-        echo '  <ifard:postReactions>' . "\n";
+        echo '  <custom:postReactions>' . "\n";
         foreach ($postReactions as $pr) {
             if (!in_array($pr['reaction_type'], getAllowedReactionTypes(), true)) {
                 continue;
             }
-            echo '    <ifard:reaction pageUrl="' . $e($pr['page_url']) . '"';
+            echo '    <custom:reaction pageUrl="' . $e($pr['page_url']) . '"';
             echo ' type="' . $e($pr['reaction_type']) . '"';
             echo ' ip="' . $e($pr['ip_address']) . '"';
             echo ' createdAt="' . $isoDate($pr['created_at']) . '"/>' . "\n";
         }
-        echo '  </ifard:postReactions>' . "\n\n";
+        echo '  </custom:postReactions>' . "\n\n";
     }
 
     echo '</disqus>' . "\n";

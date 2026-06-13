@@ -58,7 +58,7 @@ RedirectMatch 403 /comments/logs/.*
 </FilesMatch>
 
 # Block access to all utility PHP files
-<FilesMatch "^(import-|set-password|setup|test-|backup-|migrate-|enable-).*\.php$">
+<FilesMatch "^(import-|setup|test-|backup-|migrate-|enable-).*\.php$">
     Require all denied
 </FilesMatch>
 
