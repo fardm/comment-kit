@@ -1,4 +1,8 @@
-این پروژه برای اضافه کردن قابلیت کامنت به کوارتز هست. ریپوی اصلی [اینجاست](https://github.com/dlnorman/standalone-comments). من کمی کدش رو تغییر دادم تا برای کوارتز بهینه باشه.
+[English](https://github.com/fardm/standalone-comments-server/blob/main/README.md) | فارسی
+
+# کامنت مستقل
+
+این پروژه برای اضافه کردن قابلیت کامنت به [Quartz](https://quartz.jzhao.xyz/) هست. ریپوی اصلی [اینجاست](https://github.com/dlnorman/standalone-comments). من کمی کدش رو تغییر دادم تا برای کوارتز بهینه باشه.
 
 ## امکانات
 - ثبت ری اکشن با 10 تا ایموجی هم برای یادداشت هم برای کامنت

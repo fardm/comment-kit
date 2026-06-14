@@ -1,8 +1,14 @@
+English | [فارسی](https://github.com/fardm/standalone-comments-server/blob/main/README-fa.md)
+
 # Quartz Standalone Comments
 
-This project adds a commenting system to Quartz. The original repository can be found here: https://github.com/dlnorman/standalone-comments. I made several modifications to improve compatibility and usability for Quartz websites.
+This project adds a commenting system to [Quartz](https://quartz.jzhao.xyz/). The original repository can be found here: https://github.com/dlnorman/standalone-comments.
+
+ I made several modifications to improve compatibility and usability for Quartz websites.
 
 ## Features
+
+![image](comments.webp)
 
 - Reactions with 10 emoji options for both posts and comments
 - Admin panel for viewing and managing comments
