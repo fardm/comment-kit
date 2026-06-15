@@ -2668,6 +2668,92 @@ if ($method === 'POST' && $action === 'delete_spam') {
     jsonResponse(['success' => true, 'deleted' => $count]);
 }
 
+// POST /api.php?action=db_delete_data (admin)
+// Preview counts or delete selected data categories (keeps schema intact).
+if ($method === 'POST' && $action === 'db_delete_data') {
+    if (!isAdmin()) {
+        jsonResponse(['error' => 'Unauthorized'], 401);
+    }
+
+    $input = getInput();
+    $csrfToken = $input['csrf_token'] ?? '';
+    if (!validateCSRFToken($csrfToken)) {
+        jsonResponse(['error' => 'Invalid CSRF token'], 403);
+    }
+
+    $preview = !empty($input['preview']);
+
+    $commentsCount = (int)($db->query("SELECT COUNT(*) AS c FROM comments")->fetch()['c'] ?? 0);
+    $votesCount = (int)($db->query("SELECT COUNT(*) AS c FROM votes")->fetch()['c'] ?? 0);
+    $postReactionsCount = (int)($db->query("SELECT COUNT(*) AS c FROM post_reactions")->fetch()['c'] ?? 0);
+    $voteLogCount = (int)($db->query("SELECT COUNT(*) AS c FROM vote_log")->fetch()['c'] ?? 0);
+    $subscriptionsCount = (int)($db->query("SELECT COUNT(*) AS c FROM subscriptions")->fetch()['c'] ?? 0);
+    $reactionsCount = $votesCount + $postReactionsCount + $voteLogCount;
+
+    if ($preview) {
+        jsonResponse([
+            'success' => true,
+            'counts' => [
+                'comments' => $commentsCount,
+                'reactions' => $reactionsCount,
+                'subscriptions' => $subscriptionsCount,
+            ],
+            'details' => [
+                'votes' => $votesCount,
+                'post_reactions' => $postReactionsCount,
+                'vote_log' => $voteLogCount,
+            ],
+        ]);
+    }
+
+    $categories = $input['categories'] ?? [];
+    if (!is_array($categories) || count($categories) === 0) {
+        jsonResponse(['error' => 'No categories selected'], 400);
+    }
+    $allowed = ['comments', 'reactions', 'subscriptions'];
+    foreach ($categories as $cat) {
+        if (!in_array($cat, $allowed, true)) {
+            jsonResponse(['error' => 'Invalid category: ' . $cat], 400);
+        }
+    }
+
+    $toDeleteComments = in_array('comments', $categories, true);
+    $toDeleteReactions = in_array('reactions', $categories, true);
+    $toDeleteSubscriptions = in_array('subscriptions', $categories, true);
+
+    $deleted = ['comments' => 0, 'reactions' => 0, 'subscriptions' => 0];
+
+    $db->beginTransaction();
+    try {
+        if ($toDeleteReactions) {
+            $db->exec("DELETE FROM votes");
+            $db->exec("DELETE FROM post_reactions");
+            $db->exec("DELETE FROM vote_log");
+            $deleted['reactions'] = $reactionsCount;
+        }
+
+        if ($toDeleteSubscriptions) {
+            $db->exec("DELETE FROM subscriptions");
+            $deleted['subscriptions'] = $subscriptionsCount;
+        }
+
+        if ($toDeleteComments) {
+            $db->exec("DELETE FROM comments");
+            $deleted['comments'] = $commentsCount;
+        }
+
+        $db->commit();
+    } catch (PDOException $e) {
+        $db->rollBack();
+        jsonResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
+    }
+
+    jsonResponse([
+        'success' => true,
+        'deleted' => $deleted,
+    ]);
+}
+
 // GET /api.php?action=widget_config
 // Public endpoint: frontend widget language and asset hints
 if ($method === 'GET' && $action === 'widget_config') {
