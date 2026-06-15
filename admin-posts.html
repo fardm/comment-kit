@@ -699,12 +699,13 @@
                 const isMagnet = pct > 50;
                 const lastDate  = p.last_comment_at  ? formatDate(p.last_comment_at)  : '—';
                 const firstDate = p.first_comment_at ? formatDate(p.first_comment_at) : '—';
-                const urlShort  = p.page_url.replace(/^https?:\/\//, '');
+                const pageHref = p.page_url_href || p.page_url;
+                const urlShort  = pageHref.replace(/^https?:\/\//, '');
 
                 return `<tr${isMagnet ? ' class="spam-magnet"' : ''}>
                     <td class="url-cell">
-                        <span class="url-text" title="${escapeHtml(p.page_url)}">
-                            <a href="${escapeHtml(p.page_url)}" target="_blank" rel="noopener">${escapeHtml(urlShort)}</a>
+                        <span class="url-text" title="${escapeHtml(pageHref)}">
+                            <a href="${escapeHtml(pageHref)}" target="_blank" rel="noopener">${escapeHtml(urlShort)}</a>
                         </span>
                     </td>
                     <td>

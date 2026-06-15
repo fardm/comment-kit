@@ -457,7 +457,7 @@
                         <span>${new Date(comment.created_at).toLocaleString()}</span>
                         <span class="badge badge-${comment.status}">${comment.status}</span>
                     </div>
-                    <div class="body-text"><strong>Page:</strong> <a href="${escapeHtml(comment.page_url)}" target="_blank" style="color: #4a90e2; text-decoration: none;">${escapeHtml(comment.page_url)}</a></div>
+                    <div class="body-text"><strong>Page:</strong> <a href="${escapeHtml(comment.page_url_href || comment.page_url)}" target="_blank" style="color: #4a90e2; text-decoration: none;">${escapeHtml(comment.page_url_href || comment.page_url)}</a></div>
                     <div class="body-text"><strong>IP:</strong> ${escapeHtml(comment.ip_address || 'N/A')}</div>
                     ${comment.parent_id ? `<div class="body-text"><strong>Reply to:</strong> Comment #${comment.parent_id}</div>` : ''}
                     <div class="comment-content" id="comment-content-${comment.id}">${escapeHtml(comment.content)}</div>

@@ -56,6 +56,74 @@ if (!defined('APP_PATH')) {
     define('APP_PATH', $parsedPath ?: '/');
 }
 
+// Website origin for content page URLs (distinct from APP_URL when installed on a subdomain/path).
+function getSiteOrigin() {
+    static $origin = null;
+    if ($origin !== null) {
+        return $origin;
+    }
+
+    if (defined('ALLOWED_ORIGINS') && is_array(ALLOWED_ORIGINS)) {
+        foreach (ALLOWED_ORIGINS as $allowed) {
+            if ($allowed !== '*' && $allowed !== '') {
+                $origin = rtrim($allowed, '/');
+                return $origin;
+            }
+        }
+    }
+
+    // Backward compatibility: same-host installs without a configured site origin.
+    $parsed = parse_url(APP_URL);
+    $scheme = $parsed['scheme'] ?? 'https';
+    $host = $parsed['host'] ?? '';
+    $origin = $host !== '' ? ($scheme . '://' . $host) : '';
+    return $origin;
+}
+
+function resolvePageUrl($pageUrl) {
+    if ($pageUrl === '' || $pageUrl === null) {
+        return $pageUrl;
+    }
+
+    if (preg_match('#^https?://#i', $pageUrl)) {
+        // Rewrite full URLs that incorrectly use the comment app host.
+        $appHost = parse_url(APP_URL, PHP_URL_HOST);
+        $pageHost = parse_url($pageUrl, PHP_URL_HOST);
+        if ($appHost && $pageHost === $appHost) {
+            $siteOrigin = getSiteOrigin();
+            if ($siteOrigin !== '') {
+                $path = parse_url($pageUrl, PHP_URL_PATH) ?? '/';
+                $query = parse_url($pageUrl, PHP_URL_QUERY);
+                $fragment = parse_url($pageUrl, PHP_URL_FRAGMENT);
+                if ($query !== null) {
+                    $path .= '?' . $query;
+                }
+                if ($fragment !== null) {
+                    $path .= '#' . $fragment;
+                }
+                return $siteOrigin . $path;
+            }
+        }
+        return $pageUrl;
+    }
+
+    $siteOrigin = getSiteOrigin();
+    if ($siteOrigin === '') {
+        return $pageUrl;
+    }
+
+    return $siteOrigin . ($pageUrl[0] === '/' ? $pageUrl : '/' . $pageUrl);
+}
+
+function enrichPageUrlHref(array &$rows, $field = 'page_url') {
+    foreach ($rows as &$row) {
+        if (isset($row[$field])) {
+            $row[$field . '_href'] = resolvePageUrl($row[$field]);
+        }
+    }
+    unset($row);
+}
+
 // Set timezone if not already set
 if (!ini_get('date.timezone')) {
     date_default_timezone_set('UTC');
@@ -449,7 +517,8 @@ function sendNotificationEmail($commentId, $pageUrl, $parentId, $authorName, $co
     // Sanitize all user input to prevent email header injection
     $safeAuthorName = sanitizeEmailContent($authorName);
     $safeContent = sanitizeEmailContent($content);
-    $safePageUrl = sanitizeEmailContent($pageUrl);
+    $resolvedPageUrl = resolvePageUrl($pageUrl);
+    $safePageUrl = sanitizeEmailContent($resolvedPageUrl);
 
     // Track who has been notified to prevent duplicates
     $notifiedEmails = [];
@@ -552,8 +621,7 @@ function sendPostReactionNotificationEmail($pageUrl, $reactionType) {
     $adminEmail = $result['value'];
 
     $reactionLabel = getReactionEmailLabel($reactionType);
-    $fullPageUrl = "https://" . $_SERVER['HTTP_HOST'] . $pageUrl;
-    $safePageUrl = sanitizeEmailContent($fullPageUrl);
+    $safePageUrl = sanitizeEmailContent(resolvePageUrl($pageUrl));
 
     $subject = "New post reaction on your site";
     $message = "Someone left a {$reactionLabel} reaction on {$safePageUrl}.\n\n";
@@ -580,8 +648,7 @@ function sendReactionNotificationEmail($commentId, $pageUrl, $authorName, $autho
     $reactionLabel = getReactionEmailLabel($reactionType);
 
     $safeAuthorName = sanitizeEmailContent($authorName);
-    $fullPageUrl = "https://" . $_SERVER['HTTP_HOST'] . $pageUrl;
-    $safePageUrl = sanitizeEmailContent($fullPageUrl);
+    $safePageUrl = sanitizeEmailContent(resolvePageUrl($pageUrl));
 
     // Get unsubscribe token if they have a subscription
     $stmt = $db->prepare("SELECT token FROM subscriptions WHERE page_url = ? AND email = ?");
@@ -1161,6 +1228,7 @@ if ($method === 'GET' && $action === 'pending') {
         $c['votes_by_reaction_type'] = $votesByCommentId[(int)$c['id']] ?? [];
     }
     unset($c);
+    enrichPageUrlHref($comments);
 
     jsonResponse([
         'comments' => $comments,
@@ -1264,6 +1332,7 @@ if ($method === 'GET' && $action === 'all') {
         $c['votes_by_reaction_type'] = $votesByCommentId[(int)$c['id']] ?? [];
     }
     unset($c);
+    enrichPageUrlHref($comments);
 
     jsonResponse([
         'comments'   => $comments,
@@ -1445,10 +1514,10 @@ if ($method === 'GET' && $action === 'export_disqus') {
     header('Content-Disposition: attachment; filename="disqus_export_' . date('Y-m-d') . '.xml"');
     header('Cache-Control: no-cache');
 
-    // Base URL for constructing full URLs from relative paths
-    $scheme  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $baseUrl = $scheme . '://' . $_SERVER['HTTP_HOST'];
-    $forum   = preg_replace('/^www\./', '', $_SERVER['HTTP_HOST']);
+    // Base URL for constructing full content page URLs from relative paths
+    $baseUrl = getSiteOrigin();
+    $forumHost = parse_url($baseUrl, PHP_URL_HOST) ?: ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $forum   = preg_replace('/^www\./', '', $forumHost);
 
     // Build thread map: page_url -> sequential thread dsq:id
     $threadMap = [];
@@ -1687,6 +1756,7 @@ if ($method === 'GET' && $action === 'posts_summary') {
         $post['total_reactions'] = (int)$post['total_reactions'];
     }
     unset($post);
+    enrichPageUrlHref($posts);
 
     $totalPosts    = count($posts);
     $totalComments = array_sum(array_column($posts, 'total_comments'));
