@@ -10,16 +10,18 @@ This project adds a commenting system to [Quartz](https://quartz.jzhao.xyz/). Th
 
 ![image](comments.webp)
 
-- Reactions with 10 emoji options for both posts and comments
-- Admin panel for viewing and managing comments
-- Data import and export support
-- Email notifications for new comments
+- 🌍 Multilingual support (English & Persian, extendable via i18n)
+- 😀 Reactions with 10 emoji options for both posts and comments
+- 🛠️ Admin panel for viewing and managing comments
+- 📦 Data import and export support
+- 🛡️ Spam protection and moderation system
+- 📧 Email notifications for new comments
 
 <br>
 
 ## Installation
 
-It is recommended to use PHP 8.0 or newer. Although the original project claims support for PHP 7.4, I encountered errors with PHP 8.1. The issues were resolved after upgrading to PHP 8.3.
+> ⚠️ It is recommended to use PHP 8.0 or newer. Although the original project claims support for PHP 7.4, I encountered errors with PHP 8.1. The issues were resolved after upgrading to PHP 8.3.
 
 ### Step 1: Install on Your Server
 
@@ -27,8 +29,9 @@ It is recommended to use PHP 8.0 or newer. Although the original project claims 
 2. Download this repository by clicking the green **Code** button and selecting **Download ZIP**.
 3. Upload the ZIP file to your hosting account's `public_html` directory and extract it.
 4. Edit the `config.php` file:
-   - Set `APP_URL` to the subdomain where you uploaded the files, for example: `comments.yourdomain.com`
-   - Set `ALLOWED_ORIGINS` to your Quartz website domain, for example: `yourdomain.com`
+   - Set `APP_URL` to the subdomain where you uploaded the files, for example: `https://comments.yourdomain.com`  
+   - Set `ALLOWED_ORIGINS` to your Quartz website domain, for example: `https://yourdomain.com`  
+   - Set `APP_LANGUAGE` to choose the frontend language (`en` or `fa`)
 5. Open `set-password.php` in your browser:
 
    ```
@@ -88,19 +91,16 @@ After deployment, visit your website and test both comments and reactions.
 
 ## Enable Email Notifications
 
-1. Open your hosting control panel and navigate to **Cron Jobs**.
-2. Add the following command:
+Email notifications require a cron job. If you installed the system on a subdomain (recommended), use the correct absolute path from your hosting provider.
 
-```bash
-php /home/username/public_html/comments/utils/process-email-queue.php
+1. Create a new Cron Job in your hosting panel  
+2. Paste the following command:
 ```
-
-3. Open the comment system admin panel.
-4. Go to **Utilities** and enable **Email Notifications**.
-5. Enter your email address in the **Admin Email** field and save the settings.
-6. Create a few test comments to verify everything is working correctly.
-
-You can also send a test email from the **Test Email** section in the admin panel.
+/usr/local/bin/php /home/username/domains/comments.example.com/public_html/utils/process-email-queue.php
+```
+3. Go to **Utilities** and enable **Email Notifications**  
+4. Enter your email address in the **Admin Email** field and save the settings  
+5. Create a few test comments to verify everything is working correctly
 
 <br>
 
@@ -108,8 +108,11 @@ You can also send a test email from the **Test Email** section in the admin pane
 
 Summary of the changes I made to the original project:
 
-- Persian localization of the interface
+- Added language configuration support for the frontend (i18n-ready setup).
 - Jalali (Persian) date support
+- Added comment sorting controls in the admin panel.
+- Refactored import/export system to include all data types (comments, reactions, subscriptions, and spam).
+- Added a one-click database cleanup feature with selectable data categories.
 - Improved styling and UI
 - Dark mode for the admin panel
 - Redesigned emoji reactions (the original version only included four Disqus-style reactions; this version provides a wider GitHub-style emoji selection)
@@ -127,11 +130,8 @@ To reduce spam and abuse, the system includes several protection layers:
 
 <br>
 
-## Roadmap
+## Future Improvements
 
-- [ ] Multi-language support (currently the interface is Persian-only; English and language switching will be added)
-- [ ] Complete export support for spam data and subscriptions
-- [ ] Refactor naming conventions and functions; the project structure is no longer closely tied to Disqus
-- [ ] Fix the import issue that causes user IP addresses to appear as `N/A` in the **All Comments** page
-- [ ] One-click database reset from the admin panel
-- [ ] Fix the **Last Reaction** display issue on mobile devices
+- [ ] Refactor `api.php` into smaller modules (comments, reactions, subscriptions, settings, import/export) to improve maintainability.
+- [ ] Create a shared admin layout/navigation component to remove duplicated HTML across admin pages.
+- [ ] Reorganize `utils/` into structured subfolders (imports, migrations, maintenance) for better clarity.

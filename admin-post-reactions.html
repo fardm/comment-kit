@@ -17,9 +17,19 @@
 
         .section-card h2 { margin-bottom: 1.5rem; }
 
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
+        }
+
+        #reactions-table table {
+            min-width: 800px;
         }
 
         th, td {
@@ -33,6 +43,7 @@
             font-weight: 600;
             font-size: 0.9rem;
             background: var(--light);
+            white-space: nowrap;
         }
 
         tr:last-child td { border-bottom: none; }
@@ -58,7 +69,7 @@
 
         .total-cell { font-weight: 600; color: #4a90e2; text-align: center; }
 
-        .actions-cell { text-align: right; }
+        .actions-cell { text-align: right; white-space: nowrap; }
 
         .btn-sm {
             padding: 0.35rem 0.75rem;
@@ -108,22 +119,7 @@
 
         .latest-reactions-table {
             font-size: 0.95rem;
-        }
-
-        .latest-reactions-table th {
-            width: 40%;
-        }
-
-        .latest-reactions-table th:nth-child(2) {
-            width: 12%;
-        }
-
-        .latest-reactions-table th:nth-child(3) {
-            width: 20%;
-        }
-
-        .latest-reactions-table th:nth-child(4) {
-            width: 28%;
+            min-width: 650px;
         }
 
         .reaction-emoji-cell {
@@ -160,11 +156,11 @@
             .nav a { flex: 1; min-width: 100px; text-align: center; }
 
             .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
 
             #login-section { margin: 20px auto; padding: 1.5rem; }
 
@@ -187,7 +183,7 @@
         </form>
     </div>
 
-    <div id="admin-section">
+    <div id="admin-section" style="display: none;">
         <header>
             <h1>Comment System Admin</h1>
             <div class="nav">
@@ -259,7 +255,7 @@
             <div class="section-card">
                 <h2>Reactions by Page</h2>
                 <div id="reactions-message"></div>
-                <div id="reactions-table">
+                <div id="reactions-table" class="table-responsive">
                     <p class="no-data">Loading...</p>
                 </div>
             </div>
@@ -278,7 +274,7 @@
                     </div>
                 </div>
                 <div id="latest-message"></div>
-                <div id="latest-reactions-container">
+                <div id="latest-reactions-container" class="table-responsive">
                     <p class="no-data">Loading...</p>
                 </div>
             </div>

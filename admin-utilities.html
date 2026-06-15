@@ -26,7 +26,7 @@
 
         .util-card-header {
             padding: 1rem 1.5rem;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid var(--gray, #e9ecef);
             display: flex;
             align-items: center;
             gap: 0.6rem;
@@ -34,7 +34,7 @@
 
         .util-card-header h2 {
             font-size: 1.1rem;
-            color: #333;
+            color: var(--body-text, #333);
         }
 
         .util-card-header .icon {
@@ -46,7 +46,8 @@
         }
 
         .util-card-body p {
-            color: #666;
+            color: var(--body-text, #666);
+            opacity: 0.8;
             font-size: 0.9rem;
             margin-bottom: 1rem;
         }
@@ -56,10 +57,16 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
             padding: 0.75rem 0;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--gray, #f0f0f0);
         }
         .setting-row:last-of-type { border-bottom: none; }
+
+        .setting-label {
+            flex: 1 1 200px;
+        }
 
         .setting-label strong {
             color: var(--body-text);
@@ -69,6 +76,21 @@
         .setting-label span {
             font-size: 0.82rem;
             color: var(--body-text);
+            opacity: 0.8;
+        }
+
+        .themed-control {
+            background-color: transparent;
+            color: var(--body-text);
+            border: 1px solid var(--gray, #ddd);
+            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.95rem;
+        }
+        
+        select.themed-control option {
+            background-color: var(--on-background, #fff);
+            color: var(--body-text, #333);
         }
 
         .toggle-switch {
@@ -130,7 +152,7 @@
 
         /* Import/export */
         .file-drop {
-            border: 2px dashed #d0d7de;
+            border: 2px dashed var(--gray, #d0d7de);
             border-radius: 6px;
             padding: 1.5rem;
             text-align: center;
@@ -159,7 +181,7 @@
 
         .preview-box {
             background: var(--on-background);
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--gray, #dee2e6);
             border-radius: 6px;
             padding: 1rem;
             margin: 0.75rem 0;
@@ -172,7 +194,7 @@
 
         .import-actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.75rem; }
 
-        /* Modal (Delete Data) */
+        /* Modal (Delete Data) - Fully Themeable */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -186,7 +208,8 @@
         .modal {
             width: 100%;
             max-width: 560px;
-            background: white;
+            background: var(--on-background, #fff);
+            color: var(--body-text, #333);
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.25);
             overflow: hidden;
@@ -197,10 +220,10 @@
             align-items: center;
             justify-content: space-between;
             gap: 0.75rem;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--gray, #eee);
         }
         .modal-footer {
-            border-top: 1px solid #eee;
+            border-top: 1px solid var(--gray, #eee);
             border-bottom: none;
             justify-content: flex-end;
         }
@@ -213,17 +236,18 @@
             font-size: 1.35rem;
             line-height: 1;
             cursor: pointer;
-            color: #666;
+            color: var(--body-text, #666);
+            opacity: 0.6;
         }
-        .modal-close:hover { color: #000; }
-        .muted { color: #888; font-size: 0.9rem; }
+        .modal-close:hover { opacity: 1; }
+        .muted { opacity: 0.7; font-size: 0.9rem; }
 
         .export-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0.75rem 0;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--gray, #f0f0f0);
         }
         .export-row:last-child { border-bottom: none; }
         .export-row .export-info strong { 
@@ -233,14 +257,16 @@
         .export-row .export-info span { 
             font-size: 0.82rem;
             color: var(--body-text);
+            opacity: 0.8;
         }
 
         /* Email test */
         .email-test-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 0.75rem;
         }
-        .email-test-row input { flex: 1; }
+        .email-test-row input { flex: 1 1 200px; }
 
         @media (max-width: 900px) {
             .utilities-grid { grid-template-columns: 1fr; }
@@ -266,12 +292,12 @@
             </div>
             <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
         </form>
-        <p style="margin-top: 1rem; color: #666; font-size: 0.9rem;">
+        <p style="margin-top: 1rem; color: var(--body-text, #666); opacity: 0.8; font-size: 0.9rem;">
             Default password: admin (change this immediately!)
         </p>
     </div>
 
-    <div id="admin-section">
+    <div id="admin-section" style="display:none;">
         <header>
             <h1>Comment System Admin</h1>
             <div class="nav">
@@ -304,6 +330,7 @@
                     <div class="util-card-body">
                         <div id="settings-message"></div>
                         <div id="settings-rows">
+                            
                             <div class="setting-row">
                                 <div class="setting-label">
                                     <strong>Require Moderation</strong>
@@ -314,6 +341,19 @@
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
+                            
+                            <!-- Moved Sorting Setting beneath Require Moderation -->
+                            <div class="setting-row">
+                                <div class="setting-label">
+                                    <strong>Comment Sort Order</strong>
+                                    <span>Default order for top-level comments on the site</span>
+                                </div>
+                                <select id="setting-comment-sort-order" class="themed-control" style="min-width: 180px;">
+                                    <option value="asc">Oldest first (ASC)</option>
+                                    <option value="desc">Newest first (DESC)</option>
+                                </select>
+                            </div>
+
                             <div class="setting-row">
                                 <div class="setting-label">
                                     <strong>Email Notifications</strong>
@@ -324,26 +364,18 @@
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
+                            
                             <div class="setting-row">
-                                <div class="setting-label">
-                                    <strong>Comment Sort Order</strong>
-                                    <span>Default order for top-level comments on the site</span>
-                                </div>
-                                <select id="setting-comment-sort-order" style="padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.95rem;">
-                                    <option value="asc">Oldest first (ASC)</option>
-                                    <option value="desc">Newest first (DESC)</option>
-                                </select>
-                            </div>
-                            <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
                                 <div class="setting-label">
                                     <strong>Admin Email</strong>
                                     <span>Receives new comment notifications</span>
                                 </div>
-                                <div style="display: flex; gap: 0.5rem; width: 100%;">
-                                    <input type="email" id="setting-admin-email" placeholder="admin@example.com" style="flex: 1;">
+                                <div style="display: flex; gap: 0.5rem; flex: 1 1 250px;">
+                                    <input type="email" id="setting-admin-email" class="themed-control" placeholder="admin@example.com" style="flex: 1;">
                                     <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save</button>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 </div>
@@ -400,7 +432,7 @@
                                 </label>
                             </div>
 
-                            <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid #dee2e6;">
+                            <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--gray, #dee2e6);">
                                 <label style="display:flex; align-items:flex-start; gap:0.5rem;">
                                     <input type="checkbox" id="dd-confirm">
                                     <span>I understand this action is permanent and want to delete the selected data.</span>
@@ -434,7 +466,7 @@
                         <div class="import-actions">
                             <button class="btn btn-secondary btn-sm" id="btn-preview" onclick="previewImport()" disabled>Preview</button>
                             <button class="btn btn-success btn-sm" id="btn-import" onclick="runImport()" disabled>Import</button>
-                            <span id="import-status" style="font-size: 0.85rem; color: #888;"></span>
+                            <span id="import-status" style="font-size: 0.85rem; color: var(--body-text, #888); opacity: 0.8;"></span>
                         </div>
                     </div>
                 </div>
@@ -488,7 +520,7 @@
                         <div class="form-group">
                             <label for="test-email-addr">Send test email to</label>
                             <div class="email-test-row">
-                                <input type="email" id="test-email-addr" placeholder="you@example.com">
+                                <input type="email" id="test-email-addr" class="themed-control" placeholder="you@example.com">
                                 <button class="btn btn-primary btn-sm" onclick="sendTestEmail()">Send</button>
                             </div>
                         </div>
@@ -915,7 +947,7 @@
                             <tr><td>Subscriptions to import</td><td><strong style="color:#28a745">${d.subscriptions_import ?? 0}</strong></td></tr>
                             <tr><td>Date range</td><td>${dateRange}</td></tr>
                         </table>
-                        ${topRows ? `<hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #dee2e6;"><strong style="font-size:0.82rem;">Top pages</strong><table style="margin-top:0.4rem;">${topRows}</table>` : ''}
+                        ${topRows ? `<hr style="margin: 0.75rem 0; border: none; border-top: 1px solid var(--gray, #dee2e6);"><strong style="font-size:0.82rem;">Top pages</strong><table style="margin-top:0.4rem;">${topRows}</table>` : ''}
                         ${(d.warnings || []).map(w => `<div class="message warning" style="margin-top:0.5rem;">${escapeHtml(w)}</div>`).join('')}
                     </div>`;
                 previewEl.style.display = 'block';
