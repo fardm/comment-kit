@@ -278,6 +278,16 @@
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
+                            <div class="setting-row">
+                                <div class="setting-label">
+                                    <strong>Comment Sort Order</strong>
+                                    <span>Default order for top-level comments on the site</span>
+                                </div>
+                                <select id="setting-comment-sort-order" style="padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.95rem;">
+                                    <option value="asc">Oldest first (ASC)</option>
+                                    <option value="desc">Newest first (DESC)</option>
+                                </select>
+                            </div>
                             <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
                                 <div class="setting-label">
                                     <strong>Admin Email</strong>
@@ -476,12 +486,15 @@
                 document.getElementById('setting-require-moderation').checked = (s.require_moderation === 'true');
                 document.getElementById('setting-enable-notifications').checked = (s.enable_notifications === 'true');
                 document.getElementById('setting-admin-email').value = s.admin_email || '';
+                document.getElementById('setting-comment-sort-order').value =
+                    (s.comment_sort_order === 'desc') ? 'desc' : 'asc';
             } catch (e) { console.error('Settings load failed', e); }
         }
 
         // Auto-save toggles on change
         document.getElementById('setting-require-moderation').addEventListener('change', saveSettings);
         document.getElementById('setting-enable-notifications').addEventListener('change', saveSettings);
+        document.getElementById('setting-comment-sort-order').addEventListener('change', saveSettings);
 
         async function saveSettings() {
             const msgEl = document.getElementById('settings-message');
@@ -491,6 +504,7 @@
                 require_moderation: document.getElementById('setting-require-moderation').checked ? 'true' : 'false',
                 enable_notifications: document.getElementById('setting-enable-notifications').checked ? 'true' : 'false',
                 admin_email: document.getElementById('setting-admin-email').value.trim(),
+                comment_sort_order: document.getElementById('setting-comment-sort-order').value,
             };
             try {
                 const r = await fetch(`${API_URL}?action=save_settings`, {

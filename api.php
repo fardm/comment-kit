@@ -124,6 +124,33 @@ function enrichPageUrlHref(array &$rows, $field = 'page_url') {
     unset($row);
 }
 
+function getCommentSortOrder() {
+    static $order = null;
+    if ($order !== null) {
+        return $order;
+    }
+
+    $db = getDatabase();
+    if ($db) {
+        $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'comment_sort_order'");
+        $stmt->execute();
+        $row = $stmt->fetch();
+        if ($row && in_array($row['value'], ['asc', 'desc'], true)) {
+            $order = $row['value'];
+            return $order;
+        }
+    }
+
+    $order = 'asc';
+    return $order;
+}
+
+function sortTopLevelComments(array &$threaded, $order = 'asc') {
+    if ($order === 'desc') {
+        usort($threaded, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
+    }
+}
+
 // Set timezone if not already set
 if (!ini_get('date.timezone')) {
     date_default_timezone_set('UTC');
@@ -761,6 +788,8 @@ if ($method === 'GET' && $action === 'comments') {
         }
     }
 
+    sortTopLevelComments($threaded, getCommentSortOrder());
+
     // Fetch post-level reaction counts for this page (single query)
     $postReactions = array_fill_keys(getAllowedReactionTypes(), 0);
     $prStmt = $db->prepare("SELECT reaction_type, COUNT(*) as count FROM post_reactions WHERE page_url = ? GROUP BY reaction_type");
@@ -772,6 +801,7 @@ if ($method === 'GET' && $action === 'comments') {
     jsonResponse([
         'comments' => $threaded,
         'post_reactions' => $postReactions,
+        'comment_sort_order' => getCommentSortOrder(),
         'pagination' => [
             'total' => $total,
             'limit' => $limit,
@@ -2389,7 +2419,7 @@ if ($method === 'GET' && $action === 'get_settings') {
         jsonResponse(['error' => 'Unauthorized'], 401);
     }
 
-    $keys = ['require_moderation', 'enable_notifications', 'admin_email'];
+    $keys = ['require_moderation', 'enable_notifications', 'admin_email', 'comment_sort_order'];
     $settings = [];
     foreach ($keys as $key) {
         $stmt = $db->prepare("SELECT value FROM settings WHERE key = ?");
@@ -2413,7 +2443,7 @@ if ($method === 'POST' && $action === 'save_settings') {
         jsonResponse(['error' => 'Invalid CSRF token'], 403);
     }
 
-    $allowed = ['require_moderation', 'enable_notifications', 'admin_email'];
+    $allowed = ['require_moderation', 'enable_notifications', 'admin_email', 'comment_sort_order'];
     $stmt = $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
 
     foreach ($allowed as $key) {
@@ -2421,6 +2451,12 @@ if ($method === 'POST' && $action === 'save_settings') {
             $value = $input[$key];
             if (in_array($key, ['require_moderation', 'enable_notifications'])) {
                 $value = ($value === 'true' || $value === true || $value === '1' || $value === 1) ? 'true' : 'false';
+            }
+            if ($key === 'comment_sort_order') {
+                $value = strtolower((string)$value);
+                if (!in_array($value, ['asc', 'desc'], true)) {
+                    jsonResponse(['error' => 'Invalid comment sort order'], 400);
+                }
             }
             if ($key === 'admin_email' && !empty($value) && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
                 jsonResponse(['error' => 'Invalid email address'], 400);
