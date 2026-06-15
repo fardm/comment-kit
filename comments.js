@@ -657,7 +657,7 @@ class CommentSystem {
         `;
 
         let html = `
-            <div class="comment ${isPending ? 'comment-pending' : ''}" id="comment-${comment.id}" style="margin-right: ${depth * 30}px">
+            <div class="comment ${isPending ? 'comment-pending' : ''}" id="comment-${comment.id}" style="margin-inline-start: ${depth * 30}px">
                 <div class="comment-meta">
                     <span class="comment-author">${authorLink}</span>
                     <a href="#comment-${comment.id}" class="comment-date">${formattedDate}</a>

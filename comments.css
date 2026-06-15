@@ -536,7 +536,7 @@
 .help-icon {
     position: absolute;
     top: 10px;
-    left: 10px;
+    inset-inline-end: 10px;
     width: 20px;
     height: 20px;
     padding: 0.1rem;
