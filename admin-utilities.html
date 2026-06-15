@@ -328,7 +328,7 @@
                         <h2>Import Comments</h2>
                     </div>
                     <div class="util-card-body">
-                        <p>Import from a Disqus XML export or WordPress WXR file. Includes comment reactions and post reactions when present in the file. Duplicate comments are skipped automatically.</p>
+                        <p>Import from a Comments Export XML file, a legacy project export, Disqus XML, or WordPress WXR. Native exports restore comments (all statuses), reactions, subscriptions, IP addresses, and metadata. Duplicate comments are skipped automatically.</p>
                         <div class="file-drop" id="file-drop" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
                             <input type="file" id="import-file" accept=".xml" onchange="handleFileSelect(event)">
                             <div class="drop-icon">📂</div>
@@ -354,10 +354,10 @@
                     <div class="util-card-body">
                         <div class="export-row">
                             <div class="export-info">
-                                <strong>Disqus XML</strong>
-                                <span>Comments, comment reactions, and post reactions in Disqus-compatible XML</span>
+                                <strong>Comments Export XML</strong>
+                                <span>Full backup: all comments (every status), reactions, subscriptions, IP addresses, and metadata</span>
                             </div>
-                            <a href="api.php?action=export_disqus" class="btn btn-primary btn-sm" id="btn-export-disqus">Download</a>
+                            <a href="api.php?action=export_comments" class="btn btn-primary btn-sm" id="btn-export-comments">Download</a>
                         </div>
                         <div style="margin-top: 1rem;">
                             <div id="export-message"></div>
@@ -656,7 +656,7 @@
             statusEl.textContent = 'Analysing…';
             document.getElementById('btn-preview').disabled = true;
             try {
-                const r = await fetch(`${API_URL}?action=import_disqus`, {
+                const r = await fetch(`${API_URL}?action=import_comments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -679,6 +679,7 @@
                 previewEl.innerHTML = `
                     <div class="preview-box">
                         <table>
+                            <tr><td>Detected format</td><td>${escapeHtml(d.format || '—')}${d.native_export ? ' (full restore)' : ''}</td></tr>
                             <tr><td>Threads / pages</td><td>${d.threads}</td></tr>
                             <tr><td>Total posts in file</td><td>${d.posts_total}</td></tr>
                             <tr><td>Will be imported</td><td><strong style="color:#28a745">${d.posts_import}</strong></td></tr>
@@ -689,6 +690,8 @@
                             <tr><td>Comment reactions to import</td><td><strong style="color:#28a745">${d.reactions_import ?? 0}</strong></td></tr>
                             <tr><td>Post reactions in file</td><td>${d.post_reactions_in_file ?? 0}</td></tr>
                             <tr><td>Post reactions to import</td><td><strong style="color:#28a745">${d.post_reactions_import ?? 0}</strong></td></tr>
+                            <tr><td>Subscriptions in file</td><td>${d.subscriptions_in_file ?? 0}</td></tr>
+                            <tr><td>Subscriptions to import</td><td><strong style="color:#28a745">${d.subscriptions_import ?? 0}</strong></td></tr>
                             <tr><td>Date range</td><td>${dateRange}</td></tr>
                         </table>
                         ${topRows ? `<hr style="margin: 0.75rem 0; border: none; border-top: 1px solid #dee2e6;"><strong style="font-size:0.82rem;">Top pages</strong><table style="margin-top:0.4rem;">${topRows}</table>` : ''}
@@ -699,7 +702,8 @@
 
                 const canImport = (d.posts_import > 0)
                     || ((d.reactions_import ?? 0) > 0)
-                    || ((d.post_reactions_import ?? 0) > 0);
+                    || ((d.post_reactions_import ?? 0) > 0)
+                    || ((d.subscriptions_import ?? 0) > 0);
                 if (canImport) {
                     document.getElementById('btn-import').disabled = false;
                     importPreviewDone = true;
@@ -717,14 +721,14 @@
 
         async function runImport() {
             if (!importFileContent || !importPreviewDone) return;
-            if (!confirm('Proceed with import? This will add comments and/or reactions to the database.')) return;
+            if (!confirm('Proceed with import? This will add comments, reactions, and/or subscriptions to the database.')) return;
             const msgEl = document.getElementById('import-message');
             const statusEl = document.getElementById('import-status');
             await ensureCSRFToken();
             document.getElementById('btn-import').disabled = true;
             statusEl.textContent = 'Importing…';
             try {
-                const r = await fetch(`${API_URL}?action=import_disqus`, {
+                const r = await fetch(`${API_URL}?action=import_comments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -742,6 +746,9 @@
                     }
                     if ((d.post_reactions_imported ?? 0) > 0) {
                         parts.push(`${d.post_reactions_imported} post reaction${d.post_reactions_imported !== 1 ? 's' : ''}`);
+                    }
+                    if ((d.subscriptions_imported ?? 0) > 0) {
+                        parts.push(`${d.subscriptions_imported} subscription${d.subscriptions_imported !== 1 ? 's' : ''}`);
                     }
                     const dupNote = d.skipped_duplicates > 0 ? ` (${d.skipped_duplicates} duplicate comments skipped)` : '';
                     msgEl.innerHTML = `<div class="message success">Imported ${parts.length ? parts.join(', ') : 'no new items'}${dupNote}.</div>`;

@@ -244,7 +244,660 @@ function getAllowedReactionTypes() {
     return array_keys(getReactionDefinitions());
 }
 
-define('CUSTOM_REACTION_NS', 'https://example.com/ns/comments-export/1.0');
+define('COMMENTS_EXPORT_NS', 'https://example.com/ns/comments-export/1.0');
+define('COMMENTS_EXPORT_VERSION', '1.0');
+// Backward-compatible alias used by older export files.
+define('CUSTOM_REACTION_NS', COMMENTS_EXPORT_NS);
+
+function normalizeExportPageUrl($link) {
+    $parsed = parse_url($link);
+    $path   = $parsed['path'] ?? $link;
+    if (isset($parsed['query']))    $path .= '?' . $parsed['query'];
+    if (isset($parsed['fragment'])) $path .= '#' . $parsed['fragment'];
+    return $path;
+}
+
+function parseExportCommentStatus($post) {
+    $custom = $post->children(COMMENTS_EXPORT_NS);
+    if (isset($custom->status)) {
+        $status = (string)$custom->status;
+        if (in_array($status, ['pending', 'approved', 'spam', 'deleted'], true)) {
+            return $status;
+        }
+    }
+    if ((string)$post->isDeleted === 'true') {
+        return 'deleted';
+    }
+    if ((string)$post->isSpam === 'true') {
+        return 'spam';
+    }
+    if ((string)$post->isApproved === 'true') {
+        return 'approved';
+    }
+    return 'pending';
+}
+
+function isProjectNativeExport($xml) {
+    $root = $xml->getName();
+    if ($root === 'commentsExport') {
+        return true;
+    }
+    if ($root === 'disqus') {
+        $custom = $xml->children(COMMENTS_EXPORT_NS);
+        return isset($custom->postReactions) || isset($custom->subscriptions);
+    }
+    return false;
+}
+
+function parseSubscriptionsFromExportXml($xml) {
+    $subscriptions = [];
+    $custom = $xml->children(COMMENTS_EXPORT_NS);
+    if (!isset($custom->subscriptions)) {
+        return $subscriptions;
+    }
+    foreach ($custom->subscriptions->children(COMMENTS_EXPORT_NS) as $node) {
+        if ((string)$node->getName() !== 'subscription') {
+            continue;
+        }
+        $attrs = $node->attributes();
+        $pageUrl = (string)($attrs['pageUrl'] ?? '');
+        $email = (string)($attrs['email'] ?? '');
+        $token = (string)($attrs['token'] ?? '');
+        if ($pageUrl === '' || $email === '' || $token === '') {
+            continue;
+        }
+        if (strpos($pageUrl, 'http') === 0) {
+            $pageUrl = normalizeExportPageUrl($pageUrl);
+        }
+        $subscribedAt = (string)($attrs['subscribedAt'] ?? '');
+        $ts = $subscribedAt !== '' ? strtotime($subscribedAt) : false;
+        $subscriptions[] = [
+            'page_url' => $pageUrl,
+            'email' => $email,
+            'token' => $token,
+            'subscribed_at' => date('Y-m-d H:i:s', $ts !== false ? $ts : time()),
+            'active' => (int)(((string)($attrs['active'] ?? '1')) !== '0'),
+        ];
+    }
+    return $subscriptions;
+}
+
+function parseExportPostNode($post, array $threads, $threadNs, $importAllStatuses) {
+    $isDeleted = ((string)$post->isDeleted) === 'true';
+    $isSpam    = ((string)$post->isSpam) === 'true';
+    if (!$importAllStatuses && ($isDeleted || $isSpam)) {
+        return null;
+    }
+
+    $exportId = (string)$post->attributes($threadNs)->id;
+    $threadId = (string)$post->thread->attributes($threadNs)->id;
+    $pageUrl  = $threads[$threadId] ?? null;
+    if (!$pageUrl) {
+        return ['orphaned' => true];
+    }
+
+    $parentExportId = null;
+    if (isset($post->parent)) {
+        $parentExportId = (string)$post->parent->attributes($threadNs)->id;
+        if ($parentExportId === '' || $parentExportId === '0') {
+            $parentExportId = null;
+        }
+    }
+
+    $custom = $post->children(COMMENTS_EXPORT_NS);
+    $updatedAt = isset($custom->updatedAt)
+        ? date('Y-m-d H:i:s', strtotime((string)$custom->updatedAt))
+        : date('Y-m-d H:i:s', strtotime((string)$post->createdAt));
+
+    return [
+        'export_id' => $exportId,
+        'parent_export_id' => ($parentExportId && $parentExportId !== '0') ? $parentExportId : null,
+        'page_url' => $pageUrl,
+        'author_name' => (string)$post->author->name ?: 'Anonymous',
+        'author_email' => (string)$post->author->email ?: '',
+        'author_url' => (string)$post->author->link ?: null,
+        'content' => html_entity_decode(strip_tags((string)$post->message), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+        'created_at' => date('Y-m-d H:i:s', strtotime((string)$post->createdAt)),
+        'updated_at' => $updatedAt,
+        'status' => parseExportCommentStatus($post),
+        'ip_address' => ((string)($post->ipAddress ?? '')) ?: null,
+        'user_agent' => isset($custom->userAgent) ? ((string)$custom->userAgent ?: null) : null,
+        'reactions' => parseCommentReactionsFromExportPost($post),
+    ];
+}
+
+function parseCommentsFromExportXml($xml) {
+    $normUrlFn = fn($link) => normalizeExportPageUrl($link);
+    $importAllStatuses = isProjectNativeExport($xml);
+
+    $threads = [];
+    $rawPosts = [];
+    $rawPostReactions = [];
+    $rawSubscriptions = [];
+    $skipped = 0;
+    $orphaned = 0;
+    $rawTotal = 0;
+
+    if ($xml->getName() === 'rss') {
+        $wpNs = 'http://wordpress.org/export/1.0/';
+        foreach ($xml->channel->item as $item) {
+            $link = (string)$item->link;
+            if (empty($link)) {
+                continue;
+            }
+            $pageUrl = $normUrlFn($link);
+            $threads[$pageUrl] = $pageUrl;
+            $wpChildren = $item->children($wpNs);
+            if (!isset($wpChildren->comment)) {
+                continue;
+            }
+            foreach ($wpChildren->comment as $comment) {
+                $wp = $comment->children($wpNs);
+                $rawTotal++;
+                $approved = (string)$wp->comment_approved;
+                if ($approved !== '1') {
+                    $skipped++;
+                    continue;
+                }
+                $wpId = (string)$wp->comment_id;
+                $parentWpId = (string)$wp->comment_parent;
+                $message = html_entity_decode(strip_tags((string)$wp->comment_content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $createdAt = date('Y-m-d H:i:s', strtotime((string)$wp->comment_date_gmt));
+                $rawPosts[] = [
+                    'export_id' => $wpId,
+                    'parent_export_id' => ($parentWpId && $parentWpId !== '0') ? $parentWpId : null,
+                    'page_url' => $pageUrl,
+                    'author_name' => (string)$wp->comment_author ?: 'Anonymous',
+                    'author_email' => (string)$wp->comment_author_email ?: '',
+                    'author_url' => (string)$wp->comment_author_url ?: null,
+                    'content' => $message,
+                    'created_at' => $createdAt,
+                    'updated_at' => $createdAt,
+                    'status' => 'approved',
+                    'ip_address' => ((string)($wp->comment_author_IP ?? '')) ?: null,
+                    'user_agent' => null,
+                    'reactions' => [],
+                ];
+            }
+        }
+    } else {
+        $rootName = $xml->getName();
+        if ($rootName !== 'commentsExport' && $rootName !== 'disqus') {
+            return ['error' => 'Unsupported export format'];
+        }
+
+        $namespaces = $xml->getNamespaces(true);
+        $threadNs = $namespaces['dsq'] ?? 'http://disqus.com/disqus-internals';
+
+        foreach ($xml->thread as $thread) {
+            $threadId = (string)$thread->attributes($threadNs)->id;
+            $link = (string)$thread->link;
+            if ($threadId && $link) {
+                $threads[$threadId] = $normUrlFn($link);
+            }
+        }
+
+        foreach ($xml->post as $post) {
+            $rawTotal++;
+            $parsed = parseExportPostNode($post, $threads, $threadNs, $importAllStatuses);
+            if ($parsed === null) {
+                $skipped++;
+                continue;
+            }
+            if (!empty($parsed['orphaned'])) {
+                $orphaned++;
+                continue;
+            }
+            $rawPosts[] = $parsed;
+        }
+
+        $rawPostReactions = parsePostReactionsFromExportXml($xml, $normUrlFn);
+        $rawSubscriptions = parseSubscriptionsFromExportXml($xml);
+    }
+
+    return [
+        'threads' => $threads,
+        'raw_posts' => $rawPosts,
+        'raw_post_reactions' => $rawPostReactions,
+        'raw_subscriptions' => $rawSubscriptions,
+        'raw_total' => $rawTotal,
+        'skipped' => $skipped,
+        'orphaned' => $orphaned,
+        'import_all_statuses' => $importAllStatuses,
+    ];
+}
+
+function buildCommentsImportPlan($db, array $parsed) {
+    $rawPosts = $parsed['raw_posts'];
+    $rawPostReactions = $parsed['raw_post_reactions'];
+    $rawSubscriptions = $parsed['raw_subscriptions'];
+
+    $existingKeys = [];
+    $existingRows = $db->query("SELECT created_at, page_url, author_name FROM comments")->fetchAll();
+    foreach ($existingRows as $row) {
+        $existingKeys[$row['created_at'] . '|' . $row['page_url'] . '|' . $row['author_name']] = true;
+    }
+
+    $dupCount = 0;
+    $newPosts = [];
+    foreach ($rawPosts as $post) {
+        $key = $post['created_at'] . '|' . $post['page_url'] . '|' . $post['author_name'];
+        if (isset($existingKeys[$key])) {
+            $dupCount++;
+        } else {
+            $newPosts[] = $post;
+        }
+    }
+
+    $reactionsInFile = 0;
+    foreach ($rawPosts as $post) {
+        $reactionsInFile += count($post['reactions'] ?? []);
+    }
+    $reactionsToImport = 0;
+    foreach ($newPosts as $post) {
+        $reactionsToImport += count($post['reactions'] ?? []);
+    }
+
+    $existingPostReactionKeys = [];
+    $existingPostReactionRows = $db->query(
+        "SELECT page_url, ip_address, reaction_type FROM post_reactions"
+    )->fetchAll();
+    foreach ($existingPostReactionRows as $row) {
+        $existingPostReactionKeys[$row['page_url'] . '|' . $row['ip_address'] . '|' . $row['reaction_type']] = true;
+    }
+    $postReactionsInFile = count($rawPostReactions);
+    $postReactionsToImport = 0;
+    foreach ($rawPostReactions as $pr) {
+        $prKey = $pr['page_url'] . '|' . $pr['ip_address'] . '|' . $pr['reaction_type'];
+        if (!isset($existingPostReactionKeys[$prKey])) {
+            $postReactionsToImport++;
+        }
+    }
+
+    $existingSubscriptionKeys = [];
+    $existingSubscriptionRows = $db->query("SELECT page_url, email FROM subscriptions")->fetchAll();
+    foreach ($existingSubscriptionRows as $row) {
+        $existingSubscriptionKeys[$row['page_url'] . '|' . $row['email']] = true;
+    }
+    $subscriptionsInFile = count($rawSubscriptions);
+    $subscriptionsToImport = 0;
+    foreach ($rawSubscriptions as $sub) {
+        $subKey = $sub['page_url'] . '|' . $sub['email'];
+        if (!isset($existingSubscriptionKeys[$subKey])) {
+            $subscriptionsToImport++;
+        }
+    }
+
+    return [
+        'new_posts' => $newPosts,
+        'dup_count' => $dupCount,
+        'reactions_in_file' => $reactionsInFile,
+        'reactions_to_import' => $reactionsToImport,
+        'post_reactions_in_file' => $postReactionsInFile,
+        'post_reactions_to_import' => $postReactionsToImport,
+        'subscriptions_in_file' => $subscriptionsInFile,
+        'subscriptions_to_import' => $subscriptionsToImport,
+        'raw_post_reactions' => $rawPostReactions,
+        'raw_subscriptions' => $rawSubscriptions,
+    ];
+}
+
+function executeCommentsImport($db, array $parsed, array $plan) {
+    $newPosts = $plan['new_posts'];
+    usort($newPosts, fn($a, $b) => strtotime($a['created_at']) - strtotime($b['created_at']));
+
+    $exportIdMap = [];
+    $imported = 0;
+    $reactionsImported = 0;
+    $postReactionsImported = 0;
+    $subscriptionsImported = 0;
+
+    $db->beginTransaction();
+    try {
+        $commentStmt = $db->prepare("
+            INSERT INTO comments (page_url, parent_id, author_name, author_email, author_url,
+                                  content, created_at, updated_at, status, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $voteStmt = $db->prepare("
+            INSERT OR IGNORE INTO votes (comment_id, ip_address, reaction_type, created_at)
+            VALUES (?, ?, ?, ?)
+        ");
+        $postReactionStmt = $db->prepare("
+            INSERT OR IGNORE INTO post_reactions (page_url, ip_address, reaction_type, created_at)
+            VALUES (?, ?, ?, ?)
+        ");
+        $subscriptionStmt = $db->prepare("
+            INSERT OR REPLACE INTO subscriptions (page_url, email, token, subscribed_at, active)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+
+        foreach ($newPosts as $post) {
+            $parentId = $post['parent_export_id']
+                ? ($exportIdMap[$post['parent_export_id']] ?? null)
+                : null;
+
+            $commentStmt->execute([
+                $post['page_url'],
+                $parentId,
+                $post['author_name'],
+                $post['author_email'],
+                $post['author_url'],
+                $post['content'],
+                $post['created_at'],
+                $post['updated_at'] ?? $post['created_at'],
+                $post['status'] ?? 'approved',
+                $post['ip_address'],
+                $post['user_agent'],
+            ]);
+
+            $newCommentId = (int)$db->lastInsertId();
+            $exportIdMap[$post['export_id']] = $newCommentId;
+            $imported++;
+
+            foreach ($post['reactions'] ?? [] as $reaction) {
+                $voteStmt->execute([
+                    $newCommentId,
+                    $reaction['ip_address'],
+                    $reaction['reaction_type'],
+                    $reaction['created_at'],
+                ]);
+                if ($voteStmt->rowCount() > 0) {
+                    $reactionsImported++;
+                }
+            }
+        }
+
+        foreach ($plan['raw_post_reactions'] as $pr) {
+            $postReactionStmt->execute([
+                $pr['page_url'],
+                $pr['ip_address'],
+                $pr['reaction_type'],
+                $pr['created_at'],
+            ]);
+            if ($postReactionStmt->rowCount() > 0) {
+                $postReactionsImported++;
+            }
+        }
+
+        foreach ($plan['raw_subscriptions'] as $sub) {
+            $subscriptionStmt->execute([
+                $sub['page_url'],
+                $sub['email'],
+                $sub['token'],
+                $sub['subscribed_at'],
+                $sub['active'],
+            ]);
+            if ($subscriptionStmt->rowCount() > 0) {
+                $subscriptionsImported++;
+            }
+        }
+
+        $db->commit();
+    } catch (PDOException $e) {
+        $db->rollBack();
+        return ['error' => 'Database error: ' . $e->getMessage()];
+    }
+
+    return [
+        'imported' => $imported,
+        'unique_pages' => count(array_unique(array_column($newPosts, 'page_url'))),
+        'skipped_duplicates' => $plan['dup_count'],
+        'reactions_imported' => $reactionsImported,
+        'post_reactions_imported' => $postReactionsImported,
+        'subscriptions_imported' => $subscriptionsImported,
+    ];
+}
+
+function handleCommentsExport($db) {
+    $stmt = $db->query("
+        SELECT id, page_url, parent_id, author_name, author_email, author_url,
+               content, created_at, updated_at, status, ip_address, user_agent
+        FROM comments
+        ORDER BY created_at ASC
+    ");
+    $comments = $stmt->fetchAll();
+
+    $votesByCommentId = [];
+    $voteRows = $db->query("
+        SELECT v.comment_id, v.reaction_type, v.ip_address, v.created_at
+        FROM votes v
+        INNER JOIN comments c ON c.id = v.comment_id
+        ORDER BY v.comment_id, v.created_at
+    ")->fetchAll();
+    foreach ($voteRows as $row) {
+        $votesByCommentId[(int)$row['comment_id']][] = $row;
+    }
+
+    $postReactions = $db->query("
+        SELECT page_url, reaction_type, ip_address, created_at
+        FROM post_reactions
+        ORDER BY page_url, created_at
+    ")->fetchAll();
+
+    $subscriptions = $db->query("
+        SELECT page_url, email, token, subscribed_at, active
+        FROM subscriptions
+        ORDER BY subscribed_at ASC
+    ")->fetchAll();
+
+    header('Content-Type: application/xml; charset=utf-8');
+    header('Content-Disposition: attachment; filename="comments_export_' . date('Y-m-d') . '.xml"');
+    header('Cache-Control: no-cache');
+
+    $baseUrl = getSiteOrigin();
+    $forumHost = parse_url($baseUrl, PHP_URL_HOST) ?: ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $forum = preg_replace('/^www\./', '', $forumHost);
+
+    $threadMap = [];
+    $threadId = 1;
+    foreach ($comments as $comment) {
+        if (!isset($threadMap[$comment['page_url']])) {
+            $threadMap[$comment['page_url']] = $threadId++;
+        }
+    }
+
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_XML1, 'UTF-8');
+    $fullUrl = function ($pageUrl) use ($baseUrl) {
+        return (strpos($pageUrl, 'http') === 0) ? $pageUrl : $baseUrl . $pageUrl;
+    };
+    $isoDate = fn($ts) => gmdate('Y-m-d\TH:i:s\Z', strtotime($ts));
+
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<commentsExport version="' . COMMENTS_EXPORT_VERSION . '"' . "\n";
+    echo '  xmlns="http://disqus.com"' . "\n";
+    echo '  xmlns:dsq="http://disqus.com/disqus-internals"' . "\n";
+    echo '  xmlns:custom="' . COMMENTS_EXPORT_NS . '"' . "\n";
+    echo '  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' . "\n";
+    echo '  xsi:schemaLocation="http://disqus.com http://disqus.com/api/schemas/1.0/disqus.xsd">' . "\n\n";
+
+    echo '  <category dsq:id="1">' . "\n";
+    echo '    <forum>' . $e($forum) . '</forum>' . "\n";
+    echo '    <title>General</title>' . "\n";
+    echo '    <isDefault>true</isDefault>' . "\n";
+    echo '  </category>' . "\n\n";
+
+    foreach ($threadMap as $pageUrl => $tid) {
+        $url = $fullUrl($pageUrl);
+        echo '  <thread dsq:id="' . $tid . '">' . "\n";
+        echo '    <id>' . $e($url) . '</id>' . "\n";
+        echo '    <forum>' . $e($forum) . '</forum>' . "\n";
+        echo '    <category dsq:id="1"/>' . "\n";
+        echo '    <link>' . $e($url) . '</link>' . "\n";
+        echo '    <title>' . $e($url) . '</title>' . "\n";
+        echo '    <createdAt>' . gmdate('Y-m-d\TH:i:s\Z') . '</createdAt>' . "\n";
+        echo '    <isClosed>false</isClosed>' . "\n";
+        echo '    <isDeleted>false</isDeleted>' . "\n";
+        echo '  </thread>' . "\n\n";
+    }
+
+    foreach ($comments as $comment) {
+        $tid = $threadMap[$comment['page_url']];
+        $status = $comment['status'];
+        $isSpam = $status === 'spam' ? 'true' : 'false';
+        $isDeleted = $status === 'deleted' ? 'true' : 'false';
+        $approved = $status === 'approved' ? 'true' : 'false';
+
+        echo '  <post dsq:id="' . $comment['id'] . '">' . "\n";
+        echo '    <thread dsq:id="' . $tid . '"/>' . "\n";
+        if ($comment['parent_id']) {
+            echo '    <parent dsq:id="' . $comment['parent_id'] . '"/>' . "\n";
+        }
+        echo '    <author>' . "\n";
+        echo '      <name>' . $e($comment['author_name']) . '</name>' . "\n";
+        if ($comment['author_email']) {
+            echo '      <email>' . $e($comment['author_email']) . '</email>' . "\n";
+        }
+        if ($comment['author_url']) {
+            echo '      <link>' . $e($comment['author_url']) . '</link>' . "\n";
+        }
+        echo '      <isAnonymous>false</isAnonymous>' . "\n";
+        echo '    </author>' . "\n";
+        echo '    <message><![CDATA[' . $comment['content'] . ']]></message>' . "\n";
+        $commentVotes = $votesByCommentId[(int)$comment['id']] ?? [];
+        if (!empty($commentVotes)) {
+            echo '    <custom:reactions>' . "\n";
+            foreach ($commentVotes as $vote) {
+                if (!in_array($vote['reaction_type'], getAllowedReactionTypes(), true)) {
+                    continue;
+                }
+                echo '      <custom:reaction type="' . $e($vote['reaction_type']) . '"';
+                echo ' ip="' . $e($vote['ip_address']) . '"';
+                echo ' createdAt="' . $isoDate($vote['created_at']) . '"/>' . "\n";
+            }
+            echo '    </custom:reactions>' . "\n";
+        }
+        echo '    <custom:status>' . $e($status) . '</custom:status>' . "\n";
+        if ($comment['ip_address']) {
+            echo '    <ipAddress>' . $e($comment['ip_address']) . '</ipAddress>' . "\n";
+        }
+        if ($comment['user_agent']) {
+            echo '    <custom:userAgent>' . $e($comment['user_agent']) . '</custom:userAgent>' . "\n";
+        }
+        echo '    <custom:updatedAt>' . $isoDate($comment['updated_at'] ?? $comment['created_at']) . '</custom:updatedAt>' . "\n";
+        echo '    <createdAt>' . $isoDate($comment['created_at']) . '</createdAt>' . "\n";
+        echo '    <isDeleted>' . $isDeleted . '</isDeleted>' . "\n";
+        echo '    <isApproved>' . $approved . '</isApproved>' . "\n";
+        echo '    <isFlagged>false</isFlagged>' . "\n";
+        echo '    <isSpam>' . $isSpam . '</isSpam>' . "\n";
+        echo '  </post>' . "\n\n";
+    }
+
+    if (!empty($postReactions)) {
+        echo '  <custom:postReactions>' . "\n";
+        foreach ($postReactions as $pr) {
+            if (!in_array($pr['reaction_type'], getAllowedReactionTypes(), true)) {
+                continue;
+            }
+            echo '    <custom:reaction pageUrl="' . $e($pr['page_url']) . '"';
+            echo ' type="' . $e($pr['reaction_type']) . '"';
+            echo ' ip="' . $e($pr['ip_address']) . '"';
+            echo ' createdAt="' . $isoDate($pr['created_at']) . '"/>' . "\n";
+        }
+        echo '  </custom:postReactions>' . "\n\n";
+    }
+
+    if (!empty($subscriptions)) {
+        echo '  <custom:subscriptions>' . "\n";
+        foreach ($subscriptions as $sub) {
+            echo '    <custom:subscription pageUrl="' . $e($sub['page_url']) . '"';
+            echo ' email="' . $e($sub['email']) . '"';
+            echo ' token="' . $e($sub['token']) . '"';
+            echo ' subscribedAt="' . $isoDate($sub['subscribed_at']) . '"';
+            echo ' active="' . ((int)$sub['active'] === 1 ? '1' : '0') . '"/>' . "\n";
+        }
+        echo '  </custom:subscriptions>' . "\n\n";
+    }
+
+    echo '</commentsExport>' . "\n";
+    exit;
+}
+
+function handleCommentsImport($db, array $input) {
+    $xmlContent = $input['content'] ?? '';
+    if (empty($xmlContent)) {
+        jsonResponse(['error' => 'No file content received'], 400);
+    }
+
+    if (PHP_VERSION_ID < 80000) {
+        libxml_disable_entity_loader(true);
+    }
+    libxml_use_internal_errors(true);
+    $xml = simplexml_load_string($xmlContent, 'SimpleXMLElement', LIBXML_NONET);
+    if ($xml === false) {
+        $errs = array_map(fn($e) => trim($e->message), libxml_get_errors());
+        jsonResponse(['error' => 'Invalid XML: ' . implode('; ', $errs)], 400);
+    }
+
+    $parsed = parseCommentsFromExportXml($xml);
+    if (isset($parsed['error'])) {
+        jsonResponse(['error' => $parsed['error']], 400);
+    }
+
+    $plan = buildCommentsImportPlan($db, $parsed);
+
+    if (!empty($input['preview'])) {
+        $pageCounts = array_count_values(array_column($plan['new_posts'], 'page_url'));
+        arsort($pageCounts);
+        $topThreads = [];
+        foreach (array_slice($pageCounts, 0, 5, true) as $url => $count) {
+            $topThreads[] = ['url' => $url, 'count' => $count];
+        }
+
+        $dates = array_column($parsed['raw_posts'], 'created_at');
+        $dateRange = $dates ? ['oldest' => min($dates), 'newest' => max($dates)] : null;
+
+        $warnings = [];
+        if (count($parsed['threads']) === 0) {
+            $warnings[] = 'No threads found in file.';
+        }
+        if ($parsed['raw_total'] === 0) {
+            $warnings[] = 'No posts found in file.';
+        }
+        if ($parsed['orphaned'] > 0) {
+            $warnings[] = $parsed['orphaned'] . ' post(s) reference unknown threads and will be skipped.';
+        }
+        if ($plan['dup_count'] > 0) {
+            $warnings[] = $plan['dup_count'] . ' duplicate(s) already in database — will be skipped.';
+        }
+
+        jsonResponse([
+            'preview' => true,
+            'format' => $xml->getName(),
+            'native_export' => $parsed['import_all_statuses'],
+            'threads' => count($parsed['threads']),
+            'posts_total' => $parsed['raw_total'],
+            'posts_import' => count($plan['new_posts']),
+            'posts_skip' => $parsed['skipped'],
+            'duplicates' => $plan['dup_count'],
+            'orphaned' => $parsed['orphaned'],
+            'reactions_in_file' => $plan['reactions_in_file'],
+            'reactions_import' => $plan['reactions_to_import'],
+            'post_reactions_in_file' => $plan['post_reactions_in_file'],
+            'post_reactions_import' => $plan['post_reactions_to_import'],
+            'subscriptions_in_file' => $plan['subscriptions_in_file'],
+            'subscriptions_import' => $plan['subscriptions_to_import'],
+            'date_range' => $dateRange,
+            'top_threads' => $topThreads,
+            'warnings' => $warnings,
+        ]);
+    }
+
+    $result = executeCommentsImport($db, $parsed, $plan);
+    if (isset($result['error'])) {
+        jsonResponse(['error' => $result['error']], 500);
+    }
+
+    jsonResponse([
+        'success' => true,
+        'imported' => $result['imported'],
+        'unique_pages' => $result['unique_pages'],
+        'skipped_duplicates' => $result['skipped_duplicates'],
+        'reactions_imported' => $result['reactions_imported'],
+        'post_reactions_imported' => $result['post_reactions_imported'],
+        'subscriptions_imported' => $result['subscriptions_imported'],
+    ]);
+}
 
 function parseCustomVoteReactionNode($node) {
     if ((string)$node->getName() !== 'reaction') {
@@ -1521,156 +2174,12 @@ if ($method === 'POST' && $action === 'test_email') {
     }
 }
 
-// GET /api.php?action=export_disqus (admin)
-if ($method === 'GET' && $action === 'export_disqus') {
+// GET /api.php?action=export_comments (admin) — legacy alias: export_disqus
+if ($method === 'GET' && ($action === 'export_comments' || $action === 'export_disqus')) {
     if (!isAdmin()) {
         jsonResponse(['error' => 'Unauthorized'], 401);
     }
-
-    // Fetch all approved/pending comments (skip spam/deleted)
-    $stmt = $db->query("
-        SELECT id, page_url, parent_id, author_name, author_email, author_url,
-               content, created_at, status, ip_address
-        FROM comments
-        WHERE status != 'spam'
-        ORDER BY created_at ASC
-    ");
-    $comments = $stmt->fetchAll();
-
-    $votesByCommentId = [];
-    $voteRows = $db->query("
-        SELECT v.comment_id, v.reaction_type, v.ip_address, v.created_at
-        FROM votes v
-        INNER JOIN comments c ON c.id = v.comment_id
-        WHERE c.status != 'spam'
-        ORDER BY v.comment_id, v.created_at
-    ")->fetchAll();
-    foreach ($voteRows as $row) {
-        $votesByCommentId[(int)$row['comment_id']][] = $row;
-    }
-
-    $postReactions = $db->query("
-        SELECT page_url, reaction_type, ip_address, created_at
-        FROM post_reactions
-        ORDER BY page_url, created_at
-    ")->fetchAll();
-
-    header('Content-Type: application/xml; charset=utf-8');
-    header('Content-Disposition: attachment; filename="disqus_export_' . date('Y-m-d') . '.xml"');
-    header('Cache-Control: no-cache');
-
-    // Base URL for constructing full content page URLs from relative paths
-    $baseUrl = getSiteOrigin();
-    $forumHost = parse_url($baseUrl, PHP_URL_HOST) ?: ($_SERVER['HTTP_HOST'] ?? 'localhost');
-    $forum   = preg_replace('/^www\./', '', $forumHost);
-
-    // Build thread map: page_url -> sequential thread dsq:id
-    $threadMap = [];
-    $threadId  = 1;
-    foreach ($comments as $comment) {
-        if (!isset($threadMap[$comment['page_url']])) {
-            $threadMap[$comment['page_url']] = $threadId++;
-        }
-    }
-
-    $e = fn($s) => htmlspecialchars((string)$s, ENT_XML1, 'UTF-8');
-    $fullUrl = function ($pageUrl) use ($baseUrl) {
-        return (strpos($pageUrl, 'http') === 0) ? $pageUrl : $baseUrl . $pageUrl;
-    };
-    $isoDate = fn($ts) => gmdate('Y-m-d\TH:i:s\Z', strtotime($ts));
-
-    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-    echo '<disqus' . "\n";
-    echo '  xmlns="http://disqus.com"' . "\n";
-    echo '  xmlns:dsq="http://disqus.com/disqus-internals"' . "\n";
-    echo '  xmlns:custom="' . CUSTOM_REACTION_NS . '"' . "\n";
-    echo '  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' . "\n";
-    echo '  xsi:schemaLocation="http://disqus.com http://disqus.com/api/schemas/1.0/disqus.xsd">' . "\n\n";
-
-    // Single default category
-    echo '  <category dsq:id="1">' . "\n";
-    echo '    <forum>' . $e($forum) . '</forum>' . "\n";
-    echo '    <title>General</title>' . "\n";
-    echo '    <isDefault>true</isDefault>' . "\n";
-    echo '  </category>' . "\n\n";
-
-    // One thread per unique page
-    foreach ($threadMap as $pageUrl => $tid) {
-        $url = $fullUrl($pageUrl);
-        echo '  <thread dsq:id="' . $tid . '">' . "\n";
-        echo '    <id>' . $e($url) . '</id>' . "\n";
-        echo '    <forum>' . $e($forum) . '</forum>' . "\n";
-        echo '    <category dsq:id="1"/>' . "\n";
-        echo '    <link>' . $e($url) . '</link>' . "\n";
-        echo '    <title>' . $e($url) . '</title>' . "\n";
-        echo '    <createdAt>' . gmdate('Y-m-d\TH:i:s\Z') . '</createdAt>' . "\n";
-        echo '    <isClosed>false</isClosed>' . "\n";
-        echo '    <isDeleted>false</isDeleted>' . "\n";
-        echo '  </thread>' . "\n\n";
-    }
-
-    // One post per comment
-    foreach ($comments as $comment) {
-        $tid      = $threadMap[$comment['page_url']];
-        $isSpam   = $comment['status'] === 'spam'    ? 'true' : 'false';
-        $approved = $comment['status'] === 'approved' ? 'true' : 'false';
-
-        echo '  <post dsq:id="' . $comment['id'] . '">' . "\n";
-        echo '    <thread dsq:id="' . $tid . '"/>' . "\n";
-        if ($comment['parent_id']) {
-            echo '    <parent dsq:id="' . $comment['parent_id'] . '"/>' . "\n";
-        }
-        echo '    <author>' . "\n";
-        echo '      <name>' . $e($comment['author_name']) . '</name>' . "\n";
-        if ($comment['author_email']) {
-            echo '      <email>' . $e($comment['author_email']) . '</email>' . "\n";
-        }
-        if ($comment['author_url']) {
-            echo '      <link>' . $e($comment['author_url']) . '</link>' . "\n";
-        }
-        echo '      <isAnonymous>false</isAnonymous>' . "\n";
-        echo '    </author>' . "\n";
-        echo '    <message><![CDATA[' . $comment['content'] . ']]></message>' . "\n";
-        $commentVotes = $votesByCommentId[(int)$comment['id']] ?? [];
-        if (!empty($commentVotes)) {
-            echo '    <custom:reactions>' . "\n";
-            foreach ($commentVotes as $vote) {
-                if (!in_array($vote['reaction_type'], getAllowedReactionTypes(), true)) {
-                    continue;
-                }
-                echo '      <custom:reaction type="' . $e($vote['reaction_type']) . '"';
-                echo ' ip="' . $e($vote['ip_address']) . '"';
-                echo ' createdAt="' . $isoDate($vote['created_at']) . '"/>' . "\n";
-            }
-            echo '    </custom:reactions>' . "\n";
-        }
-        if ($comment['ip_address']) {
-            echo '    <ipAddress>' . $e($comment['ip_address']) . '</ipAddress>' . "\n";
-        }
-        echo '    <createdAt>' . $isoDate($comment['created_at']) . '</createdAt>' . "\n";
-        echo '    <isDeleted>false</isDeleted>' . "\n";
-        echo '    <isApproved>' . $approved . '</isApproved>' . "\n";
-        echo '    <isFlagged>false</isFlagged>' . "\n";
-        echo '    <isSpam>' . $isSpam . '</isSpam>' . "\n";
-        echo '  </post>' . "\n\n";
-    }
-
-    if (!empty($postReactions)) {
-        echo '  <custom:postReactions>' . "\n";
-        foreach ($postReactions as $pr) {
-            if (!in_array($pr['reaction_type'], getAllowedReactionTypes(), true)) {
-                continue;
-            }
-            echo '    <custom:reaction pageUrl="' . $e($pr['page_url']) . '"';
-            echo ' type="' . $e($pr['reaction_type']) . '"';
-            echo ' ip="' . $e($pr['ip_address']) . '"';
-            echo ' createdAt="' . $isoDate($pr['created_at']) . '"/>' . "\n";
-        }
-        echo '  </custom:postReactions>' . "\n\n";
-    }
-
-    echo '</disqus>' . "\n";
-    exit;
+    handleCommentsExport($db);
 }
 
 // GET /api.php?action=post_reactions_summary (admin)
@@ -2038,288 +2547,19 @@ if ($method === 'POST' && $action === 'post_reaction') {
     jsonResponse(['voted' => $voted, 'reaction_type' => $reactionType, 'counts' => $counts]);
 }
 
-// POST /api.php?action=import_disqus (admin, multipart file upload)
-if ($method === 'POST' && $action === 'import_disqus') {
+// POST /api.php?action=import_comments (admin) — legacy alias: import_disqus
+if ($method === 'POST' && ($action === 'import_comments' || $action === 'import_disqus')) {
     if (!isAdmin()) {
         jsonResponse(['error' => 'Unauthorized'], 401);
     }
 
     $input = getInput();
-
     $csrfToken = $input['csrf_token'] ?? '';
     if (!validateCSRFToken($csrfToken)) {
         jsonResponse(['error' => 'Invalid CSRF token'], 403);
     }
 
-    $xmlContent = $input['content'] ?? '';
-    if (empty($xmlContent)) {
-        jsonResponse(['error' => 'No file content received'], 400);
-    }
-
-    // Disable external entity loading to prevent XXE attacks.
-    // PHP 8.0+ disables this by default; the function is deprecated there but safe to call.
-    if (PHP_VERSION_ID < 80000) {
-        libxml_disable_entity_loader(true);
-    }
-    libxml_use_internal_errors(true);
-    // LIBXML_NONET prevents any network access during parsing (all PHP versions)
-    $xml = simplexml_load_string($xmlContent, 'SimpleXMLElement', LIBXML_NONET);
-
-    if ($xml === false) {
-        $errs = array_map(fn($e) => trim($e->message), libxml_get_errors());
-        jsonResponse(['error' => 'Invalid XML: ' . implode('; ', $errs)], 400);
-    }
-
-    // Helper: normalize a full URL to path-only (matches window.location.pathname)
-    $normUrl = function($link) {
-        $parsed = parse_url($link);
-        $path   = $parsed['path'] ?? $link;
-        if (isset($parsed['query']))    $path .= '?' . $parsed['query'];
-        if (isset($parsed['fragment'])) $path .= '#' . $parsed['fragment'];
-        return $path;
-    };
-
-    $threads  = []; // unique page paths seen (keyed by path for dedup)
-    $rawTotal = 0;
-    $skipped  = 0;
-    $orphaned = 0;
-    $rawPosts = [];
-    $rawPostReactions = [];
-
-    if ($xml->getName() === 'rss') {
-        // WordPress WXR format
-        $wpNs = 'http://wordpress.org/export/1.0/';
-
-        foreach ($xml->channel->item as $item) {
-            $link = (string)$item->link;
-            if (empty($link)) continue;
-            $pageUrl = $normUrl($link);
-            $threads[$pageUrl] = $pageUrl;
-
-            $wpChildren = $item->children($wpNs);
-            if (!isset($wpChildren->comment)) continue;
-
-            foreach ($wpChildren->comment as $comment) {
-                $wp = $comment->children($wpNs);
-                $rawTotal++;
-                $approved = (string)$wp->comment_approved;
-                if ($approved !== '1') { $skipped++; continue; }
-
-                $wpId       = (string)$wp->comment_id;
-                $parentWpId = (string)$wp->comment_parent;
-                $message    = html_entity_decode(strip_tags((string)$wp->comment_content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-                $rawPosts[] = [
-                    'dsq_id'        => $wpId,
-                    'dsq_parent_id' => ($parentWpId && $parentWpId !== '0') ? $parentWpId : null,
-                    'page_url'      => $pageUrl,
-                    'author_name'   => (string)$wp->comment_author       ?: 'Anonymous',
-                    'author_email'  => (string)$wp->comment_author_email ?: '',
-                    'author_url'    => (string)$wp->comment_author_url   ?: null,
-                    'content'       => $message,
-                    'created_at'    => date('Y-m-d H:i:s', strtotime((string)$wp->comment_date_gmt)),
-                    'reactions'     => [],
-                ];
-            }
-        }
-    } else {
-        // Native Disqus XML format
-        $namespaces = $xml->getNamespaces(true);
-        $dsqNs = $namespaces['dsq'] ?? 'http://disqus.com/disqus-internals';
-
-        foreach ($xml->thread as $thread) {
-            $dsqId = (string)$thread->attributes($dsqNs)->id;
-            $link  = (string)$thread->link;
-            if ($dsqId && $link) {
-                $threads[$dsqId] = $normUrl($link);
-            }
-        }
-
-        foreach ($xml->post as $post) {
-            $rawTotal++;
-            $isDeleted = ((string)$post->isDeleted) === 'true';
-            $isSpam    = ((string)$post->isSpam)    === 'true';
-            $dsqId     = (string)$post->attributes($dsqNs)->id;
-            $threadId  = (string)$post->thread->attributes($dsqNs)->id;
-            $pageUrl   = $threads[$threadId] ?? null;
-            if ($isDeleted || $isSpam) { $skipped++; continue; }
-            if (!$pageUrl)             { $orphaned++; continue; }
-            $rawPosts[] = [
-                'dsq_id'        => $dsqId,
-                'dsq_parent_id' => (string)$post->parent->attributes($dsqNs)->id ?: null,
-                'page_url'      => $pageUrl,
-                'author_name'   => (string)$post->author->name  ?: 'Anonymous',
-                'author_email'  => (string)$post->author->email ?: '',
-                'author_url'    => (string)$post->author->link  ?: null,
-                'content'       => html_entity_decode(strip_tags((string)$post->message), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                'created_at'    => date('Y-m-d H:i:s', strtotime((string)$post->createdAt)),
-                'reactions'     => parseCommentReactionsFromExportPost($post),
-            ];
-        }
-
-        $rawPostReactions = parsePostReactionsFromExportXml($xml, $normUrl);
-    }
-
-    // Build a dedup set from existing comments: "created_at|page_url|author_name"
-    $existingKeys = [];
-    $existingRows = $db->query("SELECT created_at, page_url, author_name FROM comments")->fetchAll();
-    foreach ($existingRows as $row) {
-        $existingKeys[$row['created_at'] . '|' . $row['page_url'] . '|' . $row['author_name']] = true;
-    }
-
-    $dupCount  = 0;
-    $newPosts  = [];
-    foreach ($rawPosts as $post) {
-        $key = $post['created_at'] . '|' . $post['page_url'] . '|' . $post['author_name'];
-        if (isset($existingKeys[$key])) {
-            $dupCount++;
-        } else {
-            $newPosts[] = $post;
-        }
-    }
-
-    $reactionsInFile = 0;
-    foreach ($rawPosts as $post) {
-        $reactionsInFile += count($post['reactions'] ?? []);
-    }
-    $reactionsToImport = 0;
-    foreach ($newPosts as $post) {
-        $reactionsToImport += count($post['reactions'] ?? []);
-    }
-
-    $existingPostReactionKeys = [];
-    $existingPostReactionRows = $db->query(
-        "SELECT page_url, ip_address, reaction_type FROM post_reactions"
-    )->fetchAll();
-    foreach ($existingPostReactionRows as $row) {
-        $existingPostReactionKeys[$row['page_url'] . '|' . $row['ip_address'] . '|' . $row['reaction_type']] = true;
-    }
-    $postReactionsInFile = count($rawPostReactions);
-    $postReactionsToImport = 0;
-    foreach ($rawPostReactions as $pr) {
-        $prKey = $pr['page_url'] . '|' . $pr['ip_address'] . '|' . $pr['reaction_type'];
-        if (!isset($existingPostReactionKeys[$prKey])) {
-            $postReactionsToImport++;
-        }
-    }
-
-    // Preview mode: return stats without inserting anything
-    if (!empty($input['preview'])) {
-        $pageCounts = array_count_values(array_column($newPosts, 'page_url'));
-        arsort($pageCounts);
-        $topThreads = [];
-        foreach (array_slice($pageCounts, 0, 5, true) as $url => $count) {
-            $topThreads[] = ['url' => $url, 'count' => $count];
-        }
-
-        $dates     = array_column($rawPosts, 'created_at');
-        $dateRange = $dates ? ['oldest' => min($dates), 'newest' => max($dates)] : null;
-
-        $warnings = [];
-        if (count($threads) === 0) $warnings[] = 'No threads found in file.';
-        if ($rawTotal === 0)       $warnings[] = 'No posts found in file.';
-        if ($orphaned > 0)         $warnings[] = "$orphaned post(s) reference unknown threads and will be skipped.";
-        if ($dupCount > 0)         $warnings[] = "$dupCount duplicate(s) already in database — will be skipped.";
-
-        jsonResponse([
-            'preview'               => true,
-            'threads'               => count($threads),
-            'posts_total'           => $rawTotal,
-            'posts_import'          => count($newPosts),
-            'posts_skip'            => $skipped,
-            'duplicates'            => $dupCount,
-            'orphaned'              => $orphaned,
-            'reactions_in_file'     => $reactionsInFile,
-            'reactions_import'      => $reactionsToImport,
-            'post_reactions_in_file'=> $postReactionsInFile,
-            'post_reactions_import' => $postReactionsToImport,
-            'date_range'            => $dateRange,
-            'top_threads'           => $topThreads,
-            'warnings'              => $warnings,
-        ]);
-    }
-
-    // Sort oldest-first so parent IDs exist before children
-    usort($newPosts, fn($a, $b) => strtotime($a['created_at']) - strtotime($b['created_at']));
-
-    $postIdMap = [];
-    $imported  = 0;
-    $reactionsImported = 0;
-    $postReactionsImported = 0;
-
-    $db->beginTransaction();
-    try {
-        $stmt = $db->prepare("
-            INSERT INTO comments (page_url, parent_id, author_name, author_email, author_url,
-                                  content, created_at, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')
-        ");
-        $voteStmt = $db->prepare("
-            INSERT OR IGNORE INTO votes (comment_id, ip_address, reaction_type, created_at)
-            VALUES (?, ?, ?, ?)
-        ");
-        $postReactionStmt = $db->prepare("
-            INSERT OR IGNORE INTO post_reactions (page_url, ip_address, reaction_type, created_at)
-            VALUES (?, ?, ?, ?)
-        ");
-
-        foreach ($newPosts as $post) {
-            $parentId = $post['dsq_parent_id'] ? ($postIdMap[$post['dsq_parent_id']] ?? null) : null;
-
-            $stmt->execute([
-                $post['page_url'],
-                $parentId,
-                $post['author_name'],
-                $post['author_email'],
-                $post['author_url'],
-                $post['content'],
-                $post['created_at'],
-            ]);
-
-            $newCommentId = (int)$db->lastInsertId();
-            $postIdMap[$post['dsq_id']] = $newCommentId;
-            $imported++;
-
-            foreach ($post['reactions'] ?? [] as $reaction) {
-                $voteStmt->execute([
-                    $newCommentId,
-                    $reaction['ip_address'],
-                    $reaction['reaction_type'],
-                    $reaction['created_at'],
-                ]);
-                if ($voteStmt->rowCount() > 0) {
-                    $reactionsImported++;
-                }
-            }
-        }
-
-        foreach ($rawPostReactions as $pr) {
-            $postReactionStmt->execute([
-                $pr['page_url'],
-                $pr['ip_address'],
-                $pr['reaction_type'],
-                $pr['created_at'],
-            ]);
-            if ($postReactionStmt->rowCount() > 0) {
-                $postReactionsImported++;
-            }
-        }
-
-        $db->commit();
-    } catch (PDOException $e) {
-        $db->rollBack();
-        jsonResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
-    }
-
-    $uniquePages = count(array_unique(array_column($newPosts, 'page_url')));
-    jsonResponse([
-        'success'                => true,
-        'imported'               => $imported,
-        'unique_pages'           => $uniquePages,
-        'skipped_duplicates'     => $dupCount,
-        'reactions_imported'     => $reactionsImported,
-        'post_reactions_imported'=> $postReactionsImported,
-    ]);
+    handleCommentsImport($db, $input);
 }
 
 // POST /api.php?action=normalize_urls (admin) — one-time fix: strip scheme+host from full URLs
