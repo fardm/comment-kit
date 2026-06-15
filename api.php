@@ -40,6 +40,15 @@ if (!defined('ALLOWED_ORIGINS')) {
     define('ALLOWED_ORIGINS', ['*']);
 }
 
+if (!defined('APP_LANGUAGE')) {
+    define('APP_LANGUAGE', 'en');
+}
+
+function getAppLanguage() {
+    $lang = defined('APP_LANGUAGE') ? APP_LANGUAGE : 'en';
+    return preg_match('/^[a-z]{2}$/i', $lang) ? strtolower($lang) : 'en';
+}
+
 // Ensure APP_URL is defined based on server variables if omitted from config
 if (!defined('APP_URL')) {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
@@ -1014,19 +1023,25 @@ if ($method === 'POST' && $action === 'post') {
     }
 
     // Generate appropriate message
-    $message = 'نظر شما با موفقیت منتشر شد';
+    $messageKey = 'approved';
     if ($status === 'spam') {
+        $messageKey = 'spam';
         $message = 'Comment marked as spam';
     } else if ($status === 'pending') {
+        $messageKey = 'pending';
         $message = 'نظر شما برای بررسی ارسال شد';
     } else if ($isTrustedCommenter) {
+        $messageKey = 'trusted';
         $message = 'نظر شما با موفقیت منتشر شد (به طور خودکار تایید شد)';
+    } else {
+        $message = 'نظر شما با موفقیت منتشر شد';
     }
 
     jsonResponse([
         'success' => true,
         'id' => $commentId,
         'status' => $status,
+        'message_key' => $messageKey,
         'message' => $message,
         'trusted' => $isTrustedCommenter
     ], 201);
@@ -2411,6 +2426,12 @@ if ($method === 'POST' && $action === 'delete_spam') {
     $db->exec("DELETE FROM comments WHERE status = 'spam'");
 
     jsonResponse(['success' => true, 'deleted' => $count]);
+}
+
+// GET /api.php?action=widget_config
+// Public endpoint: frontend widget language and asset hints
+if ($method === 'GET' && $action === 'widget_config') {
+    jsonResponse(['language' => getAppLanguage()]);
 }
 
 // GET /api.php?action=get_settings (admin)

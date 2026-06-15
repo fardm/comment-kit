@@ -10,3 +10,6 @@ define('ALLOWED_ORIGINS', [
 
 // Set timezone
 date_default_timezone_set('Asia/Tehran');
+
+// Frontend comment widget language: 'en' or 'fa'
+define('APP_LANGUAGE', 'en');
