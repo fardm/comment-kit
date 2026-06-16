@@ -32,6 +32,8 @@ function getDatabase() {
         $db = new PDO('sqlite:' . DB_PATH);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        // Ensure UTF-8 encoding for SQLite
+        $db->exec('PRAGMA encoding = "UTF-8"');
         // Enable foreign key constraints in SQLite
         $db->exec('PRAGMA foreign_keys = ON');
         // Set busy timeout to 30 seconds to handle database locks

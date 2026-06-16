@@ -180,7 +180,38 @@ if (!ini_get('error_log')) {
 
 require_once 'database.php';
 
-header('Content-Type: application/json');
+// Output buffering to catch any stray output before JSON
+ob_start();
+
+// Set error handler to convert PHP errors to JSON responses
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("PHP Error: $errstr in $errfile:$errline");
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    http_response_code(500);
+    echo json_encode([
+        'error' => 'Internal Server Error',
+        'message' => 'An unexpected error occurred'
+    ]);
+    exit;
+});
+
+// Set exception handler
+set_exception_handler(function($exception) {
+    error_log('Exception: ' . $exception->getMessage());
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    http_response_code(500);
+    echo json_encode([
+        'error' => 'Internal Server Error',
+        'message' => 'An unexpected error occurred'
+    ]);
+    exit;
+});
+
+header('Content-Type: application/json; charset=utf-8');
 
 // Security headers
 header('X-Content-Type-Options: nosniff');
@@ -216,7 +247,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $db = getDatabase();
 if (!$db) {
     http_response_code(500);
-    echo json_encode(['error' => 'Database connection failed']);
+    // Clear any buffered output and ensure valid JSON
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    echo json_encode(['error' => 'Database connection failed', 'message' => 'Unable to connect to the database']);
     exit;
 }
 
@@ -986,9 +1021,55 @@ if (rand(1, 100) === 1) {
     periodicCleanup($db);
 }
 
+/**
+ * Recursively ensure all strings in data are valid UTF-8
+ */
+function ensureUtf8($data) {
+    if (is_string($data)) {
+        // Check if string is valid UTF-8, if not try to fix it
+        if (!mb_check_encoding($data, 'UTF-8')) {
+            // Try to convert from common encodings
+            $data = iconv('UTF-8', 'UTF-8//IGNORE', $data);
+            // If still empty, try latin1
+            if (empty($data)) {
+                $data = iconv('ISO-8859-1', 'UTF-8//IGNORE', $data);
+            }
+        }
+        return $data;
+    } elseif (is_array($data)) {
+        foreach ($data as &$value) {
+            $value = ensureUtf8($value);
+        }
+        return $data;
+    } elseif (is_object($data)) {
+        foreach ($data as $key => &$value) {
+            $data->$key = ensureUtf8($value);
+        }
+        return $data;
+    }
+    return $data;
+}
+
 function jsonResponse($data, $code = 200) {
+    // Clear any buffered output to prevent HTML/errors before JSON
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
     http_response_code($code);
-    echo json_encode($data);
+    
+    // Ensure all strings are valid UTF-8
+    $data = ensureUtf8($data);
+    
+    // Ensure we always output valid JSON
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        // If json_encode still fails, return a safe error
+        error_log('json_encode failed: ' . json_last_error_msg());
+        $json = json_encode(['error' => 'Internal server error', 'code' => json_last_error()]);
+    }
+    
+    echo $json;
     exit;
 }
 
@@ -1476,29 +1557,56 @@ if ($method === 'GET' && $action === 'comments') {
 // GET /api.php?action=recent&limit=10
 // Public endpoint for displaying recent comments site-wide
 if ($method === 'GET' && $action === 'recent') {
-    $limit = isset($_GET['limit']) ? min(max(1, (int)$_GET['limit']), 100) : 10;
+    try {
+        $limit = isset($_GET['limit']) ? min(max(1, (int)$_GET['limit']), 100) : 10;
 
-    $stmt = $db->prepare("
-        SELECT id, page_url, author_name, author_url,
-               content, created_at
-        FROM comments
-        WHERE status = 'approved'
-        ORDER BY created_at DESC
-        LIMIT ?
-    ");
-    $stmt->execute([$limit]);
-    $comments = $stmt->fetchAll();
-
-    // Trim content to excerpt for display
-    foreach ($comments as &$comment) {
-        if (strlen($comment['content']) > 150) {
-            $comment['excerpt'] = substr($comment['content'], 0, 150) . '...';
-        } else {
-            $comment['excerpt'] = $comment['content'];
+        $stmt = $db->prepare("
+            SELECT id, page_url, author_name, author_url,
+                   content, created_at
+            FROM comments
+            WHERE status = 'approved'
+            ORDER BY created_at DESC
+            LIMIT ?
+        ");
+        
+        if (!$stmt) {
+            throw new Exception('Failed to prepare SQL statement');
         }
-    }
+        
+        if (!$stmt->execute([$limit])) {
+            throw new Exception('Failed to execute query: ' . implode(', ', $stmt->errorInfo()));
+        }
+        
+        $comments = $stmt->fetchAll();
+        
+        if ($comments === false) {
+            throw new Exception('Failed to fetch results');
+        }
 
-    jsonResponse(['comments' => $comments]);
+        // Trim content to excerpt for display and ensure UTF-8 encoding
+        foreach ($comments as &$comment) {
+            // Ensure all string fields are valid UTF-8
+            foreach ($comment as $key => &$value) {
+                if (is_string($value) && !mb_check_encoding($value, 'UTF-8')) {
+                    $value = iconv('UTF-8', 'UTF-8//IGNORE', $value) ?: $value;
+                }
+            }
+            
+            if (strlen($comment['content']) > 150) {
+                $comment['excerpt'] = substr($comment['content'], 0, 150) . '...';
+            } else {
+                $comment['excerpt'] = $comment['content'];
+            }
+        }
+
+        jsonResponse(['comments' => $comments]);
+    } catch (PDOException $e) {
+        error_log('API recent endpoint error: ' . $e->getMessage());
+        jsonResponse(['error' => 'Database error', 'details' => $e->getMessage()], 500);
+    } catch (Exception $e) {
+        error_log('API recent endpoint error: ' . $e->getMessage());
+        jsonResponse(['error' => $e->getMessage()], 500);
+    }
 }
 
 // POST /api.php?action=vote
@@ -2815,4 +2923,11 @@ if ($method === 'POST' && $action === 'save_settings') {
     jsonResponse(['success' => true]);
 }
 
-jsonResponse(['error' => 'Invalid action'], 400);
+// Catch-all: No matching action found
+// Return 404 with valid JSON instead of empty response
+jsonResponse([
+    'error' => 'Not Found',
+    'message' => 'The requested API action does not exist',
+    'action' => $action,
+    'method' => $method
+], 404);
