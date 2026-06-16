@@ -12,6 +12,8 @@ This project adds a commenting system to [Quartz](https://quartz.jzhao.xyz/). Th
 
 - 🌍 Multilingual support (English & Persian, extendable via i18n)
 - 😀 Reactions with 10 emoji options for both posts and comments
+- 👤 Gravatar integration with automatic fallback avatars
+- 💬 Latest comments widget
 - 🛠️ Admin panel for viewing and managing comments
 - 📦 Data import and export support
 - 🛡️ Spam protection and moderation system
@@ -135,6 +137,7 @@ Summary of the changes I made to the original project:
 - Dark mode for the admin panel
 - Redesigned emoji reactions (the original version only included four Disqus-style reactions; this version provides a wider GitHub-style emoji selection)
 - Formatting help displayed inside the comment editor
+- Added Gravatar support with automatic fallback avatars.
 
 <br>
 
