@@ -162,24 +162,7 @@
         </header>
 
         <div class="container">
-            <div class="stats" id="stats">
-                <div class="stat-card">
-                    <div class="stat-number" id="stat-pending">0</div>
-                    <div class="stat-label">Pending</div>
-                </div>
-                <div class="stat-card" onclick="window.location.href='admin-all.html?status=approved'">
-                    <div class="stat-number" id="stat-approved">0</div>
-                    <div class="stat-label">Approved</div>
-                </div>
-                <div class="stat-card" onclick="window.location.href='admin-all.html'">
-                    <div class="stat-number" id="stat-total">0</div>
-                    <div class="stat-label">Total</div>
-                </div>
-                <div class="stat-card" onclick="window.location.href='admin-post-reactions.html'">
-                    <div class="stat-number" id="stat-post-reactions">—</div>
-                    <div class="stat-label">Post Reactions</div>
-                </div>
-            </div>
+
 
             <div class="comments-section">
                 <h2 style="margin-bottom: 1.5rem;">Pending Comments</h2>
@@ -312,7 +295,6 @@
 
                 if (response.ok) {
                     displayPendingComments(data.comments);
-                    updateStats(data.comments);
                 } else {
                     console.error('Failed to load comments:', data.error);
                     container.innerHTML = `<div class="message error">Error: ${data.error || 'Failed to load comments'}</div>`;
@@ -376,12 +358,6 @@
                     </div>
                 </div>
             `).join('');
-        }
-
-        function updateStats(comments) {
-            const pending = comments.filter(c => c.status === 'pending').length;
-            document.getElementById('stat-pending').textContent = pending;
-            document.getElementById('stat-total').textContent = comments.length;
         }
 
         async function moderateComment(id, status) {
