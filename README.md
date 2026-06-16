@@ -6,6 +6,8 @@ This project adds a commenting system to [Quartz](https://quartz.jzhao.xyz/). Th
 
  I made several modifications to improve compatibility and usability for Quartz websites.
 
+ > ✅ Compatible with Quartz v5
+
 ## Features
 
 ![image](comments.webp)
