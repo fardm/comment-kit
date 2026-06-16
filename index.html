@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comment System</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <style>
         * {
             margin: 0;
@@ -100,16 +102,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
-        .btn-secondary {
-            background: #48bb78;
-            color: white;
-        }
 
-        .btn-outline {
-            background: white;
-            color: #667eea;
-            border: 2px solid #667eea;
-        }
 
         .status {
             background: #e6fffa;
@@ -204,8 +197,6 @@
             <h2>Quick Actions</h2>
             <div class="actions">
                 <a href="admin.html" class="btn btn-primary">Admin Dashboard</a>
-                <a href="example.html" class="btn btn-secondary">View Demo</a>
-                <a href="README.md" class="btn btn-outline">Documentation</a>
             </div>
         </div>
 
@@ -237,39 +228,6 @@
                     <p>Simple shortcode embedding for your static site.</p>
                 </div>
             </div>
-        </div>
-
-        <div class="section">
-            <h2>Setup Checklist</h2>
-            <ul>
-                <li>Run <span class="code">php setup.php</span> to initialize database</li>
-                <li>Set admin password with <span class="code">php set-password.php</span></li>
-                <li>Configure CORS origins in <span class="code">config.php</span></li>
-                <li>Copy Hugo shortcode to your site</li>
-                <li>Import existing comments (optional)</li>
-                <li>Test posting a comment on <span class="code">example.html</span></li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>Import Your Comments</h2>
-            <p style="margin-bottom: 1rem;">Already have comments from another platform? Import them easily:</p>
-            <ul>
-                <li><strong>From Disqus:</strong> <span class="code">php import-disqus.php export.xml</span></li>
-                <li><strong>From TalkYard:</strong> <span class="code">php import-talkyard.php export.json</span></li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>API Endpoints</h2>
-            <p style="margin-bottom: 1rem;">Your comment system exposes these endpoints:</p>
-            <ul>
-                <li><strong>GET</strong> <span class="code">api.php?action=comments&url={page}</span> - Fetch comments</li>
-                <li><strong>POST</strong> <span class="code">api.php?action=post</span> - Submit new comment</li>
-                <li><strong>POST</strong> <span class="code">api.php?action=login</span> - Admin login</li>
-                <li><strong>GET</strong> <span class="code">api.php?action=pending</span> - Get pending comments (admin)</li>
-                <li><strong>PUT</strong> <span class="code">api.php?action=moderate&id={id}</span> - Moderate comment (admin)</li>
-            </ul>
         </div>
 
         <div class="footer">
