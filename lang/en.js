@@ -48,4 +48,12 @@ window.COMMENTS_I18N = {
         spam: 'Comment marked as spam',
         trusted: 'Your comment was published successfully (auto-approved).',
     },
+    recentWidget: {
+        title: 'Recent Comments',
+        loading: 'Connecting to server...',
+        empty: 'No comments yet.',
+        onPage: 'on page:',
+        error: 'Error loading comments.',
+        home: 'Home'
+    }
 };
