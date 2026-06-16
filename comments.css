@@ -590,7 +590,24 @@
   display: flex;
   flex-direction: column;
   gap: 15px;
+  max-height: 450px;
+  overflow-y: auto; 
+  padding-left: 5px; 
 }
+
+.rc-widget-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rc-widget-list::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+.rc-widget-list::-webkit-scrollbar-thumb {
+  background-color: var(--gray, #ccc); 
+  border-radius: 10px;
+}
+
 
 .rc-widget-item {
   background: var(--lightgray);
@@ -608,8 +625,10 @@
 
 .rc-widget-content {
   color: var(--darkgray);
-  margin-bottom: 5px;
+  margin-bottom: 7px;
   word-break: break-word;
+  border-bottom: solid 1px #7e7e7e47;
+  padding-bottom: 6px;
 }
 
 .rc-widget-meta {
