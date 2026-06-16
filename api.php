@@ -279,6 +279,15 @@ function getAllowedReactionTypes() {
     return array_keys(getReactionDefinitions());
 }
 
+function getGravatarUrl($email, $size = 80) {
+    // Normalize: trim whitespace and convert to lowercase
+    $email = strtolower(trim($email));
+    // Generate MD5 hash
+    $hash = md5($email);
+    // Build Gravatar URL with default "mystery person" image
+    return "https://www.gravatar.com/avatar/{$hash}?s={$size}&d=mp";
+}
+
 define('COMMENTS_EXPORT_NS', 'https://example.com/ns/comments-export/1.0');
 define('COMMENTS_EXPORT_VERSION', '1.0');
 // Backward-compatible alias used by older export files.
@@ -1516,6 +1525,10 @@ if ($method === 'GET' && $action === 'comments') {
     foreach ($comments as $comment) {
         $comment['replies'] = [];
         $comment['votes_by_reaction_type'] = $votesByCommentId[(int)$comment['id']] ?? [];
+        // Generate avatar URL from email
+        if (!empty($comment['author_email'])) {
+            $comment['author_avatar'] = getGravatarUrl($comment['author_email']);
+        }
         // Don't expose email to non-admins
         if (!isAdmin()) {
             unset($comment['author_email']);

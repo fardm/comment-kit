@@ -606,6 +606,10 @@ class CommentSystem {
             ? `<a href="${this.escapeHtml(comment.author_url)}" target="_blank" rel="nofollow noopener">${this.escapeHtml(comment.author_name)}</a>`
             : this.escapeHtml(comment.author_name);
 
+        const avatarHtml = comment.author_avatar
+            ? `<img src="${this.escapeHtml(comment.author_avatar)}" alt="${this.escapeHtml(comment.author_name)}" class="comment-avatar" loading="lazy">`
+            : '';
+
         const isPending = comment.status === 'pending';
         const pendingBadge = isPending
             ? `<span class="badge-pending">${this.escapeHtml(this.t('pendingBadge'))}</span>`
@@ -659,9 +663,12 @@ class CommentSystem {
         let html = `
             <div class="comment ${isPending ? 'comment-pending' : ''}" id="comment-${comment.id}" style="margin-inline-start: ${depth * 30}px">
                 <div class="comment-meta">
-                    <span class="comment-author">${authorLink}</span>
-                    <a href="#comment-${comment.id}" class="comment-date">${formattedDate}</a>
-                    ${pendingBadge}
+                    ${avatarHtml}
+                    <div class="comment-author-info">
+                        <span class="comment-author">${authorLink}</span>
+                        <a href="#comment-${comment.id}" class="comment-date">${formattedDate}</a>
+                        ${pendingBadge}
+                    </div>
                 </div>
                 <div class="comment-content">
                     ${this.renderMarkdown(comment.content)}
