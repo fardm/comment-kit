@@ -89,6 +89,23 @@ npx quartz sync
 
 <br>
 
+## ویجت آخرین نظرات
+
+برای نمایش آخرین نظرات در سایدبار یا هر بخش دیگری از لایوت سایت، کد زیر را به فایل `quartz.config.yaml` اضافه کنید:
+
+```yaml
+- source: github:fardm/quartz-standalone-comments
+  enabled: true
+  options:
+    backendUrl: https://comments.yourdomain.com
+    type: recent
+    limit: 5
+  layout:
+    position: right
+    priority: 50
+```
+
+<br>
 ## فعال‌سازی اعلان‌های ایمیلی
 
 اعلان‌های ایمیلی به یک کرون جاب (Cron Job) نیاز دارند. اگر سیستم را روی یک ساب‌دامین نصب کرده‌اید (که توصیه می‌شود)، از مسیر مطلق (Absolute Path) صحیح مربوط به ارائه‌دهنده هاست خود استفاده کنید.

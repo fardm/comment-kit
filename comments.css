@@ -593,7 +593,7 @@
 }
 
 .rc-widget-item {
-  background: var(--lightgray, #f5f5f5);
+  background: var(--lightgray);
   padding: 10px;
   border-radius: 5px;
   font-size: 0.9rem;
@@ -607,28 +607,28 @@
 }
 
 .rc-widget-content {
-  color: var(--darkgray, #555);
+  color: var(--darkgray);
   margin-bottom: 5px;
   word-break: break-word;
 }
 
 .rc-widget-meta {
   font-size: 0.75rem;
-  color: var(--gray, #888);
+  color: var(--darkgray);
 }
 
 .rc-widget-link {
   text-decoration: none;
-  color: var(--tertiary, #3498db);
+  color: var(--tertiary);
 }
 
 .rc-widget-loading,
 .rc-widget-empty {
   font-size: 0.9rem;
-  color: var(--gray, #888);
+  color: var(--gray);
 }
 
 .rc-widget-error {
   font-size: 0.9rem;
-  color: var(--red, #e74c3c);
+  color: #e74c3c;
 }

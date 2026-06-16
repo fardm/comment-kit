@@ -89,6 +89,24 @@ After deployment, visit your website and test both comments and reactions.
 
 <br>
 
+## Recent Comments Widget
+
+To display the latest comments in your sidebar or any other part of your site's layout, simply add the following configuration to your `quartz.config.yaml` file:
+
+```yaml
+- source: github:fardm/quartz-standalone-comments
+  enabled: true
+  options:
+    backendUrl: [https://comments.yourdomain.com](https://comments.yourdomain.com)
+    type: recent
+    limit: 5
+  layout:
+    position: right
+    priority: 50
+```
+
+<br>
+
 ## Enable Email Notifications
 
 Email notifications require a cron job. If you installed the system on a subdomain (recommended), use the correct absolute path from your hosting provider.
