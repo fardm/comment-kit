@@ -2347,6 +2347,7 @@ if ($method === 'GET' && $action === 'post_reactions_summary') {
 
     $pages = array_values($byPage);
     usort($pages, fn($a, $b) => ($b['total'] ?? 0) <=> ($a['total'] ?? 0));
+    enrichPageUrlHref($pages);
 
     $totalCount = array_sum(array_map(fn($p) => (int)($p['total'] ?? 0), $pages));
 
@@ -2372,6 +2373,7 @@ if ($method === 'GET' && $action === 'post_reactions_latest') {
     ");
     $stmt->execute([$limit]);
     $reactions = $stmt->fetchAll();
+    enrichPageUrlHref($reactions);
 
     jsonResponse(['reactions' => $reactions]);
 }

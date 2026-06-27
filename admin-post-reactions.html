@@ -452,9 +452,12 @@
                     return `<td class="reaction-cell">${count}</td>`;
                 }).join('');
 
-                const safeUrl = escapeHtml(p.page_url);
-                const rowId = `row-${encodeURIComponent(p.page_url)}`;
+                const displayUrl = p.page_url_href || p.page_url;
+                const rawPageUrl = p.page_url || '';
+                const safeUrl = escapeHtml(displayUrl);
+                const rowId = `row-${encodeURIComponent(rawPageUrl)}`;
                 const total = p.total || Object.values(reactions).reduce((s, v) => s + (parseInt(v) || 0), 0) || 0;
+                const pageUrlEscaped = rawPageUrl.replace(/'/g, "\\'");
 
                 return `
                     <tr id="${rowId}">
@@ -462,7 +465,7 @@
                         ${cells}
                         <td class="total-cell">${total}</td>
                         <td class="actions-cell">
-                            <button class="btn btn-danger btn-sm" onclick="clearReactions('${safeUrl.replace(/'/g, "\\'")}')">Clear</button>
+                            <button class="btn btn-danger btn-sm" onclick="clearReactions('${pageUrlEscaped}')">Clear</button>
                         </td>
                     </tr>
                 `;
@@ -582,12 +585,12 @@
             const thead = '<tr><th>Page</th><th>Reaction</th><th>IP Address</th><th>Date</th><th class="actions-cell">Actions</th></tr>';
 
             const rows = reactions.map(r => {
-                const safeUrl = escapeHtml(r.page_url);
+                const safeUrl = escapeHtml(r.page_url_href || r.page_url);
                 const emoji = emojiByType[r.reaction_type] || r.reaction_type;
                 const date = formatDate(r.created_at || r.date);
                 const ip = escapeHtml(r.ip_address || 'N/A');
                 const reactionId = r.id || r.reaction_id;
-                const pageUrlEscaped = r.page_url.replace(/'/g, "\\'");
+                const pageUrlEscaped = (r.page_url || '').replace(/'/g, "\\'");
 
                 return `
                     <tr>
