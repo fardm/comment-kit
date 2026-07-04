@@ -2,7 +2,7 @@
 
 import type { Env } from '../types';
 import { Database } from '../lib/db';
-import { generateToken, isValidEmail, errorResponse, jsonResponse, parseAllowedOrigins, setCORSHeaders } from '../lib/utils';
+import { generateToken, isValidEmail, errorResponse, jsonResponse, parseAllowedOrigins, setCORSHeaders, getOrigin } from '../lib/utils';
 
 export async function handleCreateSubscription(request: Request, env: Env): Promise<Response> {
   try {
@@ -26,7 +26,7 @@ export async function handleCreateSubscription(request: Request, env: Env): Prom
       // Duplicate subscription
       if (error.message && error.message.includes('UNIQUE')) {
         const response = jsonResponse({ message: 'Already subscribed' }, 200);
-        return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+        return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
       }
       throw error;
     }
@@ -35,7 +35,7 @@ export async function handleCreateSubscription(request: Request, env: Env): Prom
       message: 'Subscription created successfully',
       token 
     }, 201);
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error creating subscription:', error);
     return errorResponse('Failed to create subscription', 500);
@@ -59,7 +59,7 @@ export async function handleUnsubscribe(request: Request, env: Env): Promise<Res
     }
 
     const response = jsonResponse({ message: 'Unsubscribed successfully' });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error unsubscribing:', error);
     return errorResponse('Failed to unsubscribe', 500);
@@ -84,7 +84,7 @@ export async function handleGetSubscriptions(request: Request, env: Env): Promis
     }
 
     const response = jsonResponse({ subscriptions });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching subscriptions:', error);
     return errorResponse('Failed to fetch subscriptions', 500);

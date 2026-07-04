@@ -42,12 +42,7 @@ export class Auth {
     }
     
     // Update last activity
-    await this.db.createSession({
-      token,
-      expires_at: session.expires_at,
-      ip_address: session.ip_address,
-      user_agent: session.user_agent
-    });
+    await this.db.updateSession(token);
     
     return true;
   }

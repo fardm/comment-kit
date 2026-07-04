@@ -363,6 +363,11 @@ export class Database {
     return result || null;
   }
 
+  async updateSession(token: string): Promise<boolean> {
+    const result = await this.db.prepare('UPDATE sessions SET last_activity = CURRENT_TIMESTAMP WHERE token = ?').bind(token).run();
+    return result.success && (result.meta.changes || 0) > 0;
+  }
+
   async deleteSession(token: string): Promise<boolean> {
     const result = await this.db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
     return result.success && (result.meta.changes || 0) > 0;

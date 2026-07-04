@@ -1,13 +1,7 @@
-// Main Cloudflare Worker entry point
+-- Insert admin panel HTML into settings table
+-- Run this with: wrangler d1 execute comments-db --remote --file=scripts/setup-admin-panel.sql
 
-import type { Env } from './types';
-import * as commentHandlers from './handlers/comments';
-import * as reactionHandlers from './handlers/reactions';
-import * as subscriptionHandlers from './handlers/subscriptions';
-import * as adminHandlers from './handlers/admin';
-
-// Admin panel HTML (inlined to avoid database escaping issues)
-const ADMIN_HTML = `<!DOCTYPE html>
+INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_html', '<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -21,7 +15,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       background: #f5f5f5;
       color: #333;
     }
@@ -371,7 +365,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
       <form id="loginForm">
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="new-password">
+          <input type="password" id="password" name="password" required>
         </div>
         <button type="submit" class="btn btn-primary">Login</button>
       </form>
@@ -506,8 +500,8 @@ const ADMIN_HTML = `<!DOCTYPE html>
   </div>
 
   <script>
-    const API_BASE = '/api/admin';
-    let authToken = localStorage.getItem('adminToken');
+    const API_BASE = ''/api/admin'';
+    let authToken = localStorage.getItem(''adminToken'');
     let currentPage = 0;
     const pageSize = 50;
 
@@ -517,14 +511,14 @@ const ADMIN_HTML = `<!DOCTYPE html>
     }
 
     // Login form
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    document.getElementById(''loginForm'').addEventListener(''submit'', async (e) => {
       e.preventDefault();
-      const password = document.getElementById('password').value;
+      const password = document.getElementById(''password'').value;
       
       try {
-        const response = await fetch(\`\${API_BASE}/login\`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const response = await fetch(`${API_BASE}/login`, {
+          method: ''POST'',
+          headers: { ''Content-Type'': ''application/json'' },
           body: JSON.stringify({ password })
         });
         
@@ -532,116 +526,116 @@ const ADMIN_HTML = `<!DOCTYPE html>
         
         if (response.ok) {
           authToken = data.token;
-          localStorage.setItem('adminToken', authToken);
+          localStorage.setItem(''adminToken'', authToken);
           showAdminPanel();
         } else {
-          showError(data.error || 'Login failed');
+          showError(data.error || ''Login failed'');
         }
       } catch (error) {
-        showError('Network error');
+        showError(''Network error'');
       }
     });
 
     // Logout
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
+    document.getElementById(''logoutBtn'').addEventListener(''click'', async () => {
       try {
-        await fetch(\`\${API_BASE}/logout\`, {
-          method: 'POST',
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        await fetch(`${API_BASE}/logout`, {
+          method: ''POST'',
+          headers: { ''Authorization'': `Bearer ${authToken}` }
         });
       } catch (error) {
-        console.error('Logout error:', error);
+        console.error(''Logout error:'', error);
       }
       
       authToken = null;
-      localStorage.removeItem('adminToken');
+      localStorage.removeItem(''adminToken'');
       showLoginScreen();
     });
 
     // Tab navigation
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll(''.nav-tab'').forEach(tab => {
+      tab.addEventListener(''click'', () => {
+        document.querySelectorAll(''.nav-tab'').forEach(t => t.classList.remove(''active''));
+        document.querySelectorAll(''.tab-content'').forEach(c => c.classList.remove(''active''));
         
-        tab.classList.add('active');
-        document.getElementById(\`\${tab.dataset.tab}Tab\`).classList.add('active');
+        tab.classList.add(''active'');
+        document.getElementById(`${tab.dataset.tab}Tab`).classList.add(''active'');
         
-        if (tab.dataset.tab === 'comments') loadComments();
-        if (tab.dataset.tab === 'analytics') loadAnalytics();
-        if (tab.dataset.tab === 'settings') loadSettings();
+        if (tab.dataset.tab === ''comments'') loadComments();
+        if (tab.dataset.tab === ''analytics'') loadAnalytics();
+        if (tab.dataset.tab === ''settings'') loadSettings();
       });
     });
 
     // Filter comments
-    document.getElementById('applyFilter').addEventListener('click', () => {
+    document.getElementById(''applyFilter'').addEventListener(''click'', () => {
       currentPage = 0;
       loadComments();
     });
 
     // Settings form
-    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+    document.getElementById(''settingsForm'').addEventListener(''submit'', async (e) => {
       e.preventDefault();
       
       const settings = {
-        require_moderation: document.getElementById('requireModeration').checked,
-        allow_guest_comments: document.getElementById('allowGuestComments').checked,
-        max_comment_length: document.getElementById('maxCommentLength').value,
-        comment_sort_order: document.getElementById('commentSortOrder').value,
-        admin_email: document.getElementById('adminEmail').value
+        require_moderation: document.getElementById(''requireModeration'').checked,
+        allow_guest_comments: document.getElementById(''allowGuestComments'').checked,
+        max_comment_length: document.getElementById(''maxCommentLength'').value,
+        comment_sort_order: document.getElementById(''commentSortOrder'').value,
+        admin_email: document.getElementById(''adminEmail'').value
       };
       
       try {
-        const response = await fetch(\`\${API_BASE}/settings\`, {
-          method: 'PUT',
+        const response = await fetch(`${API_BASE}/settings`, {
+          method: ''PUT'',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': \`Bearer \${authToken}\`
+            ''Content-Type'': ''application/json'',
+            ''Authorization'': `Bearer ${authToken}`
           },
           body: JSON.stringify(settings)
         });
         
         if (response.ok) {
-          showMessage('Settings saved successfully', 'success');
+          showMessage(''Settings saved successfully'', ''success'');
         } else {
-          showMessage('Failed to save settings', 'error');
+          showMessage(''Failed to save settings'', ''error'');
         }
       } catch (error) {
-        showMessage('Network error', 'error');
+        showMessage(''Network error'', ''error'');
       }
     });
 
     // Export
-    document.getElementById('exportBtn').addEventListener('click', async () => {
+    document.getElementById(''exportBtn'').addEventListener(''click'', async () => {
       try {
-        const response = await fetch(\`\${API_BASE}/export\`, {
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        const response = await fetch(`${API_BASE}/export`, {
+          headers: { ''Authorization'': `Bearer ${authToken}` }
         });
         
         if (response.ok) {
           const data = await response.json();
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: ''application/json'' });
           const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
+          const a = document.createElement(''a'');
           a.href = url;
-          a.download = \`comments-export-\${new Date().toISOString().split('T')[0]}.json\`;
+          a.download = `comments-export-${new Date().toISOString().split(''T'')[0]}.json`;
           a.click();
           URL.revokeObjectURL(url);
         } else {
-          showMessage('Export failed', 'error');
+          showMessage(''Export failed'', ''error'');
         }
       } catch (error) {
-        showMessage('Network error', 'error');
+        showMessage(''Network error'', ''error'');
       }
     });
 
     // Import
-    document.getElementById('importBtn').addEventListener('click', async () => {
-      const fileInput = document.getElementById('importFile');
+    document.getElementById(''importBtn'').addEventListener(''click'', async () => {
+      const fileInput = document.getElementById(''importFile'');
       const file = fileInput.files[0];
       
       if (!file) {
-        showMessage('Please select a file', 'error');
+        showMessage(''Please select a file'', ''error'');
         return;
       }
       
@@ -649,11 +643,11 @@ const ADMIN_HTML = `<!DOCTYPE html>
         const text = await file.text();
         const data = JSON.parse(text);
         
-        const response = await fetch(\`\${API_BASE}/import\`, {
-          method: 'POST',
+        const response = await fetch(`${API_BASE}/import`, {
+          method: ''POST'',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': \`Bearer \${authToken}\`
+            ''Content-Type'': ''application/json'',
+            ''Authorization'': `Bearer ${authToken}`
           },
           body: JSON.stringify(data)
         });
@@ -661,19 +655,19 @@ const ADMIN_HTML = `<!DOCTYPE html>
         const result = await response.json();
         
         if (response.ok) {
-          showMessage(result.message, 'success');
+          showMessage(result.message, ''success'');
         } else {
-          showMessage(result.error || 'Import failed', 'error');
+          showMessage(result.error || ''Import failed'', ''error'');
         }
       } catch (error) {
-        showMessage('Invalid file format', 'error');
+        showMessage(''Invalid file format'', ''error'');
       }
     });
 
     async function verifyToken() {
       try {
-        const response = await fetch(\`\${API_BASE}/verify\`, {
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        const response = await fetch(`${API_BASE}/verify`, {
+          headers: { ''Authorization'': `Bearer ${authToken}` }
         });
         
         if (response.ok) {
@@ -687,45 +681,45 @@ const ADMIN_HTML = `<!DOCTYPE html>
     }
 
     function showAdminPanel() {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('adminPanel').classList.add('active');
+      document.getElementById(''loginScreen'').style.display = ''none'';
+      document.getElementById(''adminPanel'').classList.add(''active'');
       loadComments();
     }
 
     function showLoginScreen() {
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('adminPanel').classList.remove('active');
+      document.getElementById(''loginScreen'').style.display = ''flex'';
+      document.getElementById(''adminPanel'').classList.remove(''active'');
     }
 
     function showError(message) {
-      const errorDiv = document.getElementById('loginError');
+      const errorDiv = document.getElementById(''loginError'');
       errorDiv.textContent = message;
-      errorDiv.style.display = 'block';
+      errorDiv.style.display = ''block'';
     }
 
     function showMessage(message, type) {
-      const messageDiv = document.getElementById('settingsMessage');
+      const messageDiv = document.getElementById(''settingsMessage'');
       messageDiv.textContent = message;
       messageDiv.className = type;
-      messageDiv.style.display = 'block';
-      setTimeout(() => messageDiv.style.display = 'none', 3000);
+      messageDiv.style.display = ''block'';
+      setTimeout(() => messageDiv.style.display = ''none'', 3000);
     }
 
     async function loadComments() {
-      const status = document.getElementById('statusFilter').value;
-      const pageUrl = document.getElementById('pageUrlFilter').value;
+      const status = document.getElementById(''statusFilter'').value;
+      const pageUrl = document.getElementById(''pageUrlFilter'').value;
       
       const params = new URLSearchParams({
         limit: pageSize,
         offset: currentPage * pageSize
       });
       
-      if (status) params.append('status', status);
-      if (pageUrl) params.append('page_url', pageUrl);
+      if (status) params.append(''status'', status);
+      if (pageUrl) params.append(''page_url'', pageUrl);
       
       try {
-        const response = await fetch(\`\${API_BASE}/comments?\${params}\`, {
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        const response = await fetch(`${API_BASE}/comments?${params}`, {
+          headers: { ''Authorization'': `Bearer ${authToken}` }
         });
         
         const data = await response.json();
@@ -734,22 +728,22 @@ const ADMIN_HTML = `<!DOCTYPE html>
           renderComments(data.comments);
           renderPagination(data.total);
         } else {
-          document.getElementById('commentsContainer').innerHTML = '<div class="error">Failed to load comments</div>';
+          document.getElementById(''commentsContainer'').innerHTML = ''<div class="error">Failed to load comments</div>'';
         }
       } catch (error) {
-        document.getElementById('commentsContainer').innerHTML = '<div class="error">Network error</div>';
+        document.getElementById(''commentsContainer'').innerHTML = ''<div class="error">Network error</div>'';
       }
     }
 
     function renderComments(comments) {
-      const container = document.getElementById('commentsContainer');
+      const container = document.getElementById(''commentsContainer'');
       
       if (comments.length === 0) {
-        container.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;">No comments found</div>';
+        container.innerHTML = ''<div style="padding: 40px; text-align: center; color: #666;">No comments found</div>'';
         return;
       }
       
-      container.innerHTML = \`
+      container.innerHTML = `
         <div class="comments-table">
           <table>
             <thead>
@@ -764,50 +758,50 @@ const ADMIN_HTML = `<!DOCTYPE html>
               </tr>
             </thead>
             <tbody>
-              \${comments.map(comment => \`
+              ${comments.map(comment => `
                 <tr>
-                  <td>\${comment.id}</td>
-                  <td>\${escapeHtml(comment.author_name)}</td>
-                  <td class="comment-content">\${escapeHtml(comment.content)}</td>
-                  <td class="comment-content">\${escapeHtml(comment.page_url)}</td>
-                  <td><span class="status-badge status-\${comment.status}">\${comment.status}</span></td>
-                  <td>\${new Date(comment.created_at).toLocaleDateString()}</td>
+                  <td>${comment.id}</td>
+                  <td>${escapeHtml(comment.author_name)}</td>
+                  <td class="comment-content">${escapeHtml(comment.content)}</td>
+                  <td class="comment-content">${escapeHtml(comment.page_url)}</td>
+                  <td><span class="status-badge status-${comment.status}">${comment.status}</span></td>
+                  <td>${new Date(comment.created_at).toLocaleDateString()}</td>
                   <td class="actions">
-                    \${comment.status === 'pending' ? \`
-                      <button onclick="updateComment(\${comment.id}, 'approved')" class="btn btn-success">Approve</button>
-                      <button onclick="updateComment(\${comment.id}, 'spam')" class="btn btn-danger">Spam</button>
-                    \` : ''}
-                    <button onclick="deleteComment(\${comment.id})" class="btn btn-danger">Delete</button>
+                    ${comment.status === ''pending'' ? `
+                      <button onclick="updateComment(${comment.id}, ''approved'')" class="btn btn-success">Approve</button>
+                      <button onclick="updateComment(${comment.id}, ''spam'')" class="btn btn-danger">Spam</button>
+                    ` : ''}
+                    <button onclick="deleteComment(${comment.id})" class="btn btn-danger">Delete</button>
                   </td>
                 </tr>
-              \`).join('')}
+              `).join('''')}
             </tbody>
           </table>
         </div>
-      \`;
+      `;
     }
 
     function renderPagination(total) {
       const totalPages = Math.ceil(total / pageSize);
-      const pagination = document.getElementById('pagination');
+      const pagination = document.getElementById(''pagination'');
       
       if (totalPages <= 1) {
-        pagination.innerHTML = '';
+        pagination.innerHTML = '''';
         return;
       }
       
-      let html = '';
+      let html = '''';
       
       if (currentPage > 0) {
-        html += \`<button onclick="goToPage(\${currentPage - 1})">Previous</button>\`;
+        html += `<button onclick="goToPage(${currentPage - 1})">Previous</button>`;
       }
       
       for (let i = 0; i < totalPages; i++) {
-        html += \`<button onclick="goToPage(\${i})" \${i === currentPage ? 'class="active"' : ''}>\${i + 1}</button>\`;
+        html += `<button onclick="goToPage(${i})" ${i === currentPage ? ''class="active"'' : ''''}>${i + 1}</button>`;
       }
       
       if (currentPage < totalPages - 1) {
-        html += \`<button onclick="goToPage(\${currentPage + 1})">Next</button>\`;
+        html += `<button onclick="goToPage(${currentPage + 1})">Next</button>`;
       }
       
       pagination.innerHTML = html;
@@ -820,11 +814,11 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
     async function updateComment(id, status) {
       try {
-        const response = await fetch(\`\${API_BASE}/comment?id=\${id}\`, {
-          method: 'PUT',
+        const response = await fetch(`${API_BASE}/comment?id=${id}`, {
+          method: ''PUT'',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': \`Bearer \${authToken}\`
+            ''Content-Type'': ''application/json'',
+            ''Authorization'': `Bearer ${authToken}`
           },
           body: JSON.stringify({ status })
         });
@@ -832,50 +826,50 @@ const ADMIN_HTML = `<!DOCTYPE html>
         if (response.ok) {
           loadComments();
         } else {
-          alert('Failed to update comment');
+          alert(''Failed to update comment'');
         }
       } catch (error) {
-        alert('Network error');
+        alert(''Network error'');
       }
     }
 
     async function deleteComment(id) {
-      if (!confirm('Are you sure you want to delete this comment?')) return;
+      if (!confirm(''Are you sure you want to delete this comment?'')) return;
       
       try {
-        const response = await fetch(\`\${API_BASE}/comment?id=\${id}\`, {
-          method: 'DELETE',
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        const response = await fetch(`${API_BASE}/comment?id=${id}`, {
+          method: ''DELETE'',
+          headers: { ''Authorization'': `Bearer ${authToken}` }
         });
         
         if (response.ok) {
           loadComments();
         } else {
-          alert('Failed to delete comment');
+          alert(''Failed to delete comment'');
         }
       } catch (error) {
-        alert('Network error');
+        alert(''Network error'');
       }
     }
 
     async function loadAnalytics() {
       try {
-        const response = await fetch(\`\${API_BASE}/analytics\`, {
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        const response = await fetch(`${API_BASE}/analytics`, {
+          headers: { ''Authorization'': `Bearer ${authToken}` }
         });
         
         const data = await response.json();
         
         if (response.ok) {
-          document.getElementById('totalComments').textContent = data.total_comments;
-          document.getElementById('approvedComments').textContent = data.approved_comments;
-          document.getElementById('pendingComments').textContent = data.pending_comments;
-          document.getElementById('spamComments').textContent = data.spam_comments;
-          document.getElementById('totalReactions').textContent = data.total_reactions;
-          document.getElementById('totalSubscribers').textContent = data.total_subscribers;
+          document.getElementById(''totalComments'').textContent = data.total_comments;
+          document.getElementById(''approvedComments'').textContent = data.approved_comments;
+          document.getElementById(''pendingComments'').textContent = data.pending_comments;
+          document.getElementById(''spamComments'').textContent = data.spam_comments;
+          document.getElementById(''totalReactions'').textContent = data.total_reactions;
+          document.getElementById(''totalSubscribers'').textContent = data.total_subscribers;
           
-          const byPageContainer = document.getElementById('commentsByPage');
-          byPageContainer.innerHTML = \`
+          const byPageContainer = document.getElementById(''commentsByPage'');
+          byPageContainer.innerHTML = `
             <table>
               <thead>
                 <tr>
@@ -884,162 +878,46 @@ const ADMIN_HTML = `<!DOCTYPE html>
                 </tr>
               </thead>
               <tbody>
-                \${data.comments_by_page.map(item => \`
+                ${data.comments_by_page.map(item => `
                   <tr>
-                    <td class="comment-content">\${escapeHtml(item.page_url)}</td>
-                    <td>\${item.count}</td>
+                    <td class="comment-content">${escapeHtml(item.page_url)}</td>
+                    <td>${item.count}</td>
                   </tr>
-                \`).join('')}
+                `).join('''')}
               </tbody>
             </table>
-          \`;
+          `;
         }
       } catch (error) {
-        console.error('Failed to load analytics:', error);
+        console.error(''Failed to load analytics:'', error);
       }
     }
 
     async function loadSettings() {
       try {
-        const response = await fetch(\`\${API_BASE}/settings\`, {
-          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        const response = await fetch(`${API_BASE}/settings`, {
+          headers: { ''Authorization'': `Bearer ${authToken}` }
         });
         
         const data = await response.json();
         
         if (response.ok) {
-          document.getElementById('requireModeration').checked = data.require_moderation === 'true';
-          document.getElementById('allowGuestComments').checked = data.allow_guest_comments === 'true';
-          document.getElementById('maxCommentLength').value = data.max_comment_length || '5000';
-          document.getElementById('commentSortOrder').value = data.comment_sort_order || 'asc';
-          document.getElementById('adminEmail').value = data.admin_email || '';
+          document.getElementById(''requireModeration'').checked = data.require_moderation === ''true'';
+          document.getElementById(''allowGuestComments'').checked = data.allow_guest_comments === ''true'';
+          document.getElementById(''maxCommentLength'').value = data.max_comment_length || ''5000'';
+          document.getElementById(''commentSortOrder'').value = data.comment_sort_order || ''asc'';
+          document.getElementById(''adminEmail'').value = data.admin_email || '''';
         }
       } catch (error) {
-        console.error('Failed to load settings:', error);
+        console.error(''Failed to load settings:'', error);
       }
     }
 
     function escapeHtml(text) {
-      const div = document.createElement('div');
+      const div = document.createElement(''div'');
       div.textContent = text;
       return div.innerHTML;
     }
   </script>
 </body>
-</html>`;
-
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    // CORS preflight
-    if (request.method === 'OPTIONS') {
-      return commentHandlers.handleOptions(request, env);
-    }
-
-    // Public API routes
-    if (path === '/api/comments' && request.method === 'GET') {
-      return commentHandlers.handleGetComments(request, env);
-    }
-
-    if (path === '/api/comments' && request.method === 'POST') {
-      return commentHandlers.handleCreateComment(request, env);
-    }
-
-    if (path === '/api/comment' && request.method === 'GET') {
-      return commentHandlers.handleGetComment(request, env);
-    }
-
-    // Reaction routes
-    if (path === '/api/vote' && request.method === 'POST') {
-      return reactionHandlers.handleCreateVote(request, env);
-    }
-
-    if (path === '/api/vote' && request.method === 'GET') {
-      return reactionHandlers.handleGetCommentReactions(request, env);
-    }
-
-    if (path === '/api/post-reaction' && request.method === 'POST') {
-      return reactionHandlers.handleCreatePostReaction(request, env);
-    }
-
-    if (path === '/api/post-reaction' && request.method === 'GET') {
-      return reactionHandlers.handleGetPostReactions(request, env);
-    }
-
-    // Subscription routes
-    if (path === '/api/subscribe' && request.method === 'POST') {
-      return subscriptionHandlers.handleCreateSubscription(request, env);
-    }
-
-    if (path === '/api/unsubscribe' && request.method === 'GET') {
-      return subscriptionHandlers.handleUnsubscribe(request, env);
-    }
-
-    if (path === '/api/subscriptions' && request.method === 'GET') {
-      return subscriptionHandlers.handleGetSubscriptions(request, env);
-    }
-
-    // Admin API routes
-    if (path.startsWith('/api/admin/')) {
-      if (path === '/api/admin/login' && request.method === 'POST') {
-        return adminHandlers.handleAdminLogin(request, env);
-      }
-
-      if (path === '/api/admin/logout' && request.method === 'POST') {
-        return adminHandlers.handleAdminLogout(request, env);
-      }
-
-      if (path === '/api/admin/verify' && request.method === 'GET') {
-        return adminHandlers.handleAdminVerify(request, env);
-      }
-
-      if (path === '/api/admin/comments' && request.method === 'GET') {
-        return adminHandlers.handleGetAllComments(request, env);
-      }
-
-      if (path === '/api/admin/comment' && request.method === 'PUT') {
-        return adminHandlers.handleUpdateComment(request, env);
-      }
-
-      if (path === '/api/admin/comment' && request.method === 'DELETE') {
-        return adminHandlers.handleDeleteComment(request, env);
-      }
-
-      if (path === '/api/admin/comments/bulk' && request.method === 'POST') {
-        return adminHandlers.handleBulkUpdateComments(request, env);
-      }
-
-      if (path === '/api/admin/analytics' && request.method === 'GET') {
-        return adminHandlers.handleGetAnalytics(request, env);
-      }
-
-      if (path === '/api/admin/settings' && request.method === 'GET') {
-        return adminHandlers.handleGetSettings(request, env);
-      }
-
-      if (path === '/api/admin/settings' && request.method === 'PUT') {
-        return adminHandlers.handleUpdateSettings(request, env);
-      }
-
-      if (path === '/api/admin/export' && request.method === 'GET') {
-        return adminHandlers.handleExportComments(request, env);
-      }
-
-      if (path === '/api/admin/import' && request.method === 'POST') {
-        return adminHandlers.handleImportComments(request, env);
-      }
-    }
-
-    // Serve static files for admin panel
-    if (path === '/admin' || path === '/admin/') {
-      return new Response(ADMIN_HTML, {
-        headers: { 'Content-Type': 'text/html' },
-      });
-    }
-
-    // 404 for unknown routes
-    return new Response('Not Found', { status: 404 });
-  },
-};
+</html>');

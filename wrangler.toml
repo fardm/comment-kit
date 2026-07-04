@@ -1,18 +1,18 @@
 name = "standalone-comments-server"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2026-07-04"
 
 # D1 Database Binding
 [[d1_databases]]
 binding = "DB"
 database_name = "comments-db"
-database_id = "your-database-id"  # Replace with actual D1 database ID after creation
+database_id = "04b36ee2-0585-4ac4-8bf2-931c99142e02"  # Replace with actual D1 database ID after creation
 
 # Environment variables
 [vars]
-APP_URL = "https://example.com/comments"
-ALLOWED_ORIGINS = "https://example.com"
-APP_LANGUAGE = "en"
+APP_URL = "https://comments.ifard.ir"
+ALLOWED_ORIGINS = "https://ifard.ir"
+APP_LANGUAGE = "fa"
 SESSION_LIFETIME = "2592000"  # 30 days in seconds
 
 # Secrets (set via: wrangler secret put <SECRET_NAME>)

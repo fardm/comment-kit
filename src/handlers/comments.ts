@@ -35,7 +35,7 @@ export async function handleGetComments(request: Request, env: Env): Promise<Res
     const threaded = threadComments(commentsWithReactions);
 
     const response = jsonResponse({ comments: threaded, count: threaded.length });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching comments:', error);
     return errorResponse('Failed to fetch comments', 500);
@@ -115,7 +115,7 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
       status: comment.status,
       message: comment.status === 'approved' ? 'Comment published' : 'Comment submitted for moderation'
     }, 201);
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error creating comment:', error);
     return errorResponse('Failed to create comment', 500);
@@ -143,7 +143,7 @@ export async function handleGetComment(request: Request, env: Env): Promise<Resp
     const commentWithReactions = { ...comment, reactions };
 
     const response = jsonResponse(commentWithReactions);
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching comment:', error);
     return errorResponse('Failed to fetch comment', 500);

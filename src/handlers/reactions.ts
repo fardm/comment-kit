@@ -3,7 +3,7 @@
 import type { Env, ReactionType } from '../types';
 import { Database } from '../lib/db';
 import { RateLimiter } from '../lib/rate-limit';
-import { getClientIp, errorResponse, jsonResponse, parseAllowedOrigins, setCORSHeaders } from '../lib/utils';
+import { getClientIp, errorResponse, jsonResponse, parseAllowedOrigins, setCORSHeaders, getOrigin } from '../lib/utils';
 
 export async function handleCreateVote(request: Request, env: Env): Promise<Response> {
   try {
@@ -43,7 +43,7 @@ export async function handleCreateVote(request: Request, env: Env): Promise<Resp
       await rateLimiter.logVote(ip);
       const reactions = await db.getCommentReactions(comment_id);
       const response = jsonResponse({ reactions, voted: false });
-      return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+      return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
     }
 
     // Remove existing vote if different reaction
@@ -57,7 +57,7 @@ export async function handleCreateVote(request: Request, env: Env): Promise<Resp
 
     const reactions = await db.getCommentReactions(comment_id);
     const response = jsonResponse({ reactions, voted: true, reaction_type });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error creating vote:', error);
     return errorResponse('Failed to create vote', 500);
@@ -77,7 +77,7 @@ export async function handleGetCommentReactions(request: Request, env: Env): Pro
     const reactions = await db.getCommentReactions(commentId);
 
     const response = jsonResponse({ reactions });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching reactions:', error);
     return errorResponse('Failed to fetch reactions', 500);
@@ -121,14 +121,14 @@ export async function handleCreatePostReaction(request: Request, env: Env): Prom
         await db.removePostReaction(page_url, ip, reaction_type);
         const reactions = await db.getPostReactions(page_url);
         const response = jsonResponse({ reactions, reacted: false });
-        return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+        return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
       }
       throw error;
     }
 
     const reactions = await db.getPostReactions(page_url);
     const response = jsonResponse({ reactions, reacted: true, reaction_type });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error creating post reaction:', error);
     return errorResponse('Failed to create post reaction', 500);
@@ -148,7 +148,7 @@ export async function handleGetPostReactions(request: Request, env: Env): Promis
     const reactions = await db.getPostReactions(pageUrl);
 
     const response = jsonResponse({ reactions });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching post reactions:', error);
     return errorResponse('Failed to fetch post reactions', 500);

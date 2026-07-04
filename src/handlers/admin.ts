@@ -3,7 +3,8 @@
 import type { Env, CommentStatus } from '../types';
 import { Database } from '../lib/db';
 import { Auth } from '../lib/auth';
-import { extractAuthToken, errorResponse, jsonResponse, parseAllowedOrigins, setCORSHeaders } from '../lib/utils';
+import { errorResponse, jsonResponse, parseAllowedOrigins, setCORSHeaders, getOrigin } from '../lib/utils';
+import { extractAuthToken } from '../lib/auth';
 
 export async function handleAdminLogin(request: Request, env: Env): Promise<Response> {
   try {
@@ -39,7 +40,7 @@ export async function handleAdminLogin(request: Request, env: Env): Promise<Resp
       message: 'Login successful',
       token 
     });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error during admin login:', error);
     return errorResponse('Login failed', 500);
@@ -58,7 +59,7 @@ export async function handleAdminLogout(request: Request, env: Env): Promise<Res
     await auth.deleteSession(token);
 
     const response = jsonResponse({ message: 'Logged out successfully' });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error during admin logout:', error);
     return errorResponse('Logout failed', 500);
@@ -81,7 +82,7 @@ export async function handleAdminVerify(request: Request, env: Env): Promise<Res
     }
 
     const response = jsonResponse({ authenticated: true });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error verifying admin session:', error);
     return errorResponse('Verification failed', 500);
@@ -129,7 +130,7 @@ export async function handleGetAllComments(request: Request, env: Env): Promise<
       limit,
       offset
     });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching all comments:', error);
     return errorResponse('Failed to fetch comments', 500);
@@ -168,7 +169,7 @@ export async function handleUpdateComment(request: Request, env: Env): Promise<R
 
     const comment = await db.getCommentById(id);
     const response = jsonResponse({ comment });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error updating comment:', error);
     return errorResponse('Failed to update comment', 500);
@@ -196,7 +197,7 @@ export async function handleDeleteComment(request: Request, env: Env): Promise<R
     }
 
     const response = jsonResponse({ message: 'Comment deleted successfully' });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error deleting comment:', error);
     return errorResponse('Failed to delete comment', 500);
@@ -242,7 +243,7 @@ export async function handleBulkUpdateComments(request: Request, env: Env): Prom
       message: `Successfully ${action}ed ${updated} comments`,
       updated 
     });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error bulk updating comments:', error);
     return errorResponse('Failed to bulk update comments', 500);
@@ -259,7 +260,7 @@ export async function handleGetAnalytics(request: Request, env: Env): Promise<Re
     const analytics = await db.getAnalytics();
 
     const response = jsonResponse(analytics);
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching analytics:', error);
     return errorResponse('Failed to fetch analytics', 500);
@@ -279,7 +280,7 @@ export async function handleGetSettings(request: Request, env: Env): Promise<Res
     const { admin_password_hash, ...safeSettings } = settings;
 
     const response = jsonResponse(safeSettings);
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error fetching settings:', error);
     return errorResponse('Failed to fetch settings', 500);
@@ -304,7 +305,7 @@ export async function handleUpdateSettings(request: Request, env: Env): Promise<
     }
 
     const response = jsonResponse({ message: 'Settings updated successfully' });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error updating settings:', error);
     return errorResponse('Failed to update settings', 500);
@@ -330,7 +331,7 @@ export async function handleExportComments(request: Request, env: Env): Promise<
 
     const response = jsonResponse(exportData);
     response.headers.set('Content-Disposition', 'attachment; filename=comments-export.json');
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error exporting comments:', error);
     return errorResponse('Failed to export comments', 500);
@@ -377,7 +378,7 @@ export async function handleImportComments(request: Request, env: Env): Promise<
       imported,
       failed
     });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS));
+    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
   } catch (error) {
     console.error('Error importing comments:', error);
     return errorResponse('Failed to import comments', 500);

@@ -94,8 +94,14 @@ npm run d1:migrate
 ### Step 5: Set Secrets
 
 ```bash
-# Set admin password hash (generate using a SHA-256 tool)
+# Generate SHA-256 hash of your password (Linux/Mac):
+echo -n "your-password" | sha256sum
+
+# Or use an online SHA-256 generator
+
+# Set admin password hash
 wrangler secret put ADMIN_PASSWORD_HASH
+# Paste the hash when prompted
 
 # Set JWT secret (use a random 32+ character string)
 wrangler secret put JWT_SECRET
@@ -113,9 +119,11 @@ npm run deploy
 
 ### Step 7: Access Admin Panel
 
-1. Visit `https://your-worker-url/admin`
+1. Visit `https://your-worker-url/admin` (or your custom domain)
 2. Login with the password you set
 3. Configure settings in the admin panel
+
+**Note:** The admin panel HTML is now served directly from the worker code, so no database configuration is needed.
 
 ## API Endpoints
 
@@ -341,6 +349,41 @@ If you're migrating from the original PHP version:
 5. Update DNS to point to the Worker
 
 ## Configuration
+
+### Custom Domain Setup
+
+To use a custom domain for your comments server:
+
+1. **Add Custom Domain in Cloudflare Dashboard:**
+   - Go to your Cloudflare Workers dashboard
+   - Select your worker
+   - Click "Settings" → "Triggers" → "Custom Domains"
+   - Click "Add Custom Domain"
+   - Enter your domain (e.g., `comments.yourdomain.com`)
+   - Follow the DNS instructions to add the CNAME record
+
+2. **Update APP_URL in wrangler.toml:**
+   ```toml
+   [vars]
+   APP_URL = "https://comments.yourdomain.com"
+   ALLOWED_ORIGINS = "https://yourdomain.com,https://www.yourdomain.com"
+   ```
+
+3. **Deploy with new configuration:**
+   ```bash
+   npm run deploy
+   ```
+
+4. **Update ALLOWED_ORIGINS:**
+   - Add all domains that will embed the comments widget
+   - Use comma-separated values
+   - Use `*` to allow all origins (not recommended for production)
+
+**Why APP_URL matters:**
+- Used in email notifications for unsubscribe links
+- Referenced in admin panel for API calls
+- Ensures correct absolute URLs are generated
+- Required for CORS to work correctly with your custom domain
 
 ### Environment Variables
 

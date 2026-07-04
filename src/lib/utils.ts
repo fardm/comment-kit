@@ -115,10 +115,10 @@ export function isOriginAllowed(origin: string | null, allowedOrigins: string[])
   return allowedOrigins.includes(origin);
 }
 
-export function setCORSHeaders(response: Response, allowedOrigins: string[]): Response {
-  const origin = response.headers.get('Origin') || '*';
+export function setCORSHeaders(response: Response, allowedOrigins: string[], requestOrigin?: string | null): Response {
+  const origin = requestOrigin || '*';
   const allowedOrigin = allowedOrigins.includes('*') ? '*' : 
-    (allowedOrigins.includes(origin) ? origin : allowedOrigins[0]);
+    (allowedOrigins.includes(origin) ? origin : (allowedOrigins[0] || '*'));
   
   response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
