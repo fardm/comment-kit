@@ -485,6 +485,81 @@ export class Database {
     return counts;
   }
 
+  /**
+   * Aggregate comment-reaction counts across ALL comments (for the
+   * admin reactions dashboard). Returns a list of { comment_id,
+   * page_url, reaction_type, count } rows, sorted by count desc.
+   *
+   * BUG FIXED: previously the admin panel had no UI for inspecting
+   * reactions. The PHP version did, and the README promised parity.
+   * This query + the new admin endpoint below provide the data.
+   */
+  async getAllCommentReactions(
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<Array<{ comment_id: number; page_url: string; author_name: string; reaction_type: string; count: number }>> {
+    const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 500);
+    const safeOffset = Math.max(0, Math.floor(offset));
+    const result = await this.db
+      .prepare(
+        `SELECT v.comment_id, c.page_url, c.author_name, v.reaction_type, COUNT(*) as count
+         FROM votes v
+         JOIN comments c ON c.id = v.comment_id
+         GROUP BY v.comment_id, v.reaction_type
+         ORDER BY count DESC
+         LIMIT ? OFFSET ?`
+      )
+      .bind(safeLimit, safeOffset)
+      .all();
+    return (result.results || []) as any[];
+  }
+
+  /**
+   * Aggregate post-reaction counts across ALL pages (for the admin
+   * reactions dashboard). Returns a list of { page_url, reaction_type,
+   * count } rows, sorted by count desc.
+   */
+  async getAllPostReactions(
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<Array<{ page_url: string; reaction_type: string; count: number }>> {
+    const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 500);
+    const safeOffset = Math.max(0, Math.floor(offset));
+    const result = await this.db
+      .prepare(
+        `SELECT page_url, reaction_type, COUNT(*) as count
+         FROM post_reactions
+         GROUP BY page_url, reaction_type
+         ORDER BY count DESC
+         LIMIT ? OFFSET ?`
+      )
+      .bind(safeLimit, safeOffset)
+      .all();
+    return (result.results || []) as any[];
+  }
+
+  /**
+   * Total counts for the admin reactions dashboard header tiles.
+   */
+  async getReactionStats(): Promise<{
+    total_comment_reactions: number;
+    total_post_reactions: number;
+    unique_pages_with_post_reactions: number;
+  }> {
+    const [c, p, u] = await Promise.all([
+      this.db.prepare('SELECT COUNT(*) as count FROM votes').first<{ count: number }>(),
+      this.db.prepare('SELECT COUNT(*) as count FROM post_reactions').first<{ count: number }>(),
+      this.db
+        .prepare('SELECT COUNT(DISTINCT page_url) as count FROM post_reactions')
+        .first<{ count: number }>(),
+    ]);
+    return {
+      total_comment_reactions: c?.count || 0,
+      total_post_reactions: p?.count || 0,
+      unique_pages_with_post_reactions: u?.count || 0,
+    };
+  }
+
   // ------------------------------------------------------------- Subscriptions
 
   async createSubscription(data: {

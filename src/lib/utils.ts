@@ -262,6 +262,28 @@ export function errorResponse(message: string, status: number = 400): Response {
 }
 
 /**
+ * Build an error Response AND attach CORS headers in one call.
+ *
+ * BUG FIXED: previously, every handler's `catch` block returned a bare
+ * `errorResponse('Failed to ...', 500)` WITHOUT calling `setCORSHeaders()`.
+ * When the backend threw a 500, the browser received a response with no
+ * `Access-Control-Allow-Origin` header and reported a CORS error instead
+ * of the actual 500 — masking the real problem from the developer.
+ *
+ * Use this helper in any error path that needs to be readable from a
+ * cross-origin browser fetch().
+ */
+export function corsErrorResponse(
+  message: string,
+  status: number,
+  allowedOrigins: string[],
+  requestOrigin: string | null
+): Response {
+  const response = errorResponse(message, status);
+  return setCORSHeaders(response, allowedOrigins, requestOrigin);
+}
+
+/**
  * Build a threaded comment tree from a flat list.
  *
  * NOTE: the input array is mutated (a `replies` array is added to each

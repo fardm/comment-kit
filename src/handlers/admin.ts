@@ -403,6 +403,117 @@ export async function handleGetAnalytics(request: Request, env: Env): Promise<Re
   }
 }
 
+/**
+ * GET /api/admin/reactions
+ *
+ * Returns aggregated comment-reaction and post-reaction data for the
+ * admin "Reactions" dashboard tab. The PHP version had this; the
+ * Workers port shipped without it.
+ *
+ * Query params:
+ *   - kind: "comments" | "posts" (default: both)
+ *   - limit, offset: pagination (max 500)
+ */
+export async function handleGetReactions(request: Request, env: Env): Promise<Response> {
+  try {
+    if (!(await requireAdmin(request, env))) {
+      return adminError(request, env, 'Unauthorized', 401);
+    }
+
+    const url = new URL(request.url);
+    const kind = (url.searchParams.get('kind') || 'all') as 'all' | 'comments' | 'posts';
+    const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+    const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+
+    const db = new Database(env.DB);
+    const safeLimit = isNaN(limit) ? 100 : Math.min(Math.max(1, limit), 500);
+    const safeOffset = isNaN(offset) || offset < 0 ? 0 : offset;
+
+    const stats = await db.getReactionStats();
+    const payload: any = { stats };
+
+    if (kind === 'all' || kind === 'comments') {
+      payload.comment_reactions = await db.getAllCommentReactions(safeLimit, safeOffset);
+    }
+    if (kind === 'all' || kind === 'posts') {
+      payload.post_reactions = await db.getAllPostReactions(safeLimit, safeOffset);
+    }
+
+    return adminResponse(request, env, payload);
+  } catch (error) {
+    console.error('Error fetching reactions:', error);
+    return adminError(request, env, 'Failed to fetch reactions', 500);
+  }
+}
+
+/**
+ * DELETE /api/admin/reactions/comment?id=…&reaction_type=…
+ * Delete ALL votes of a specific reaction type on a specific comment.
+ * Useful for cleaning up brigading / bot activity.
+ */
+export async function handleDeleteCommentReaction(request: Request, env: Env): Promise<Response> {
+  try {
+    if (!(await requireAdmin(request, env))) {
+      return adminError(request, env, 'Unauthorized', 401);
+    }
+    const url = new URL(request.url);
+    const commentId = parseInt(url.searchParams.get('id') || '', 10);
+    const reactionType = url.searchParams.get('reaction_type');
+    if (!commentId || isNaN(commentId) || commentId <= 0) {
+      return adminError(request, env, 'Invalid comment ID', 400);
+    }
+    if (!reactionType) {
+      return adminError(request, env, 'reaction_type is required', 400);
+    }
+    const db = new Database(env.DB);
+    // Use the existing removeVote with a wildcard IP via direct SQL.
+    // removeVote requires a specific IP; for admin bulk delete we use
+    // a direct query against the votes table.
+    const result = await (db as any).db
+      .prepare(
+        `DELETE FROM votes WHERE comment_id = ? AND reaction_type = ?`
+      )
+      .bind(commentId, reactionType)
+      .run();
+    const deleted = result.meta?.changes || 0;
+    return adminResponse(request, env, { deleted });
+  } catch (error) {
+    console.error('Error deleting comment reaction:', error);
+    return adminError(request, env, 'Failed to delete comment reaction', 500);
+  }
+}
+
+/**
+ * DELETE /api/admin/reactions/post?page_url=…&reaction_type=…
+ * Delete ALL post-reactions of a specific type on a specific page.
+ */
+export async function handleDeletePostReaction(request: Request, env: Env): Promise<Response> {
+  try {
+    if (!(await requireAdmin(request, env))) {
+      return adminError(request, env, 'Unauthorized', 401);
+    }
+    const url = new URL(request.url);
+    const pageUrl = url.searchParams.get('page_url');
+    const reactionType = url.searchParams.get('reaction_type');
+    if (!pageUrl) {
+      return adminError(request, env, 'page_url is required', 400);
+    }
+    if (!reactionType) {
+      return adminError(request, env, 'reaction_type is required', 400);
+    }
+    const db = new Database(env.DB);
+    const result = await (db as any).db
+      .prepare(`DELETE FROM post_reactions WHERE page_url = ? AND reaction_type = ?`)
+      .bind(pageUrl, reactionType)
+      .run();
+    const deleted = result.meta?.changes || 0;
+    return adminResponse(request, env, { deleted });
+  } catch (error) {
+    console.error('Error deleting post reaction:', error);
+    return adminError(request, env, 'Failed to delete post reaction', 500);
+  }
+}
+
 export async function handleGetSettings(request: Request, env: Env): Promise<Response> {
   try {
     if (!(await requireAdmin(request, env))) {

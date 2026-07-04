@@ -10,6 +10,7 @@ import {
   parseAllowedOrigins,
   setCORSHeaders,
   getOrigin,
+  corsErrorResponse,
 } from '../lib/utils';
 
 const VALID_REACTIONS: ReactionType[] = [
@@ -26,22 +27,44 @@ function isReactionType(value: unknown): value is ReactionType {
   return typeof value === 'string' && (VALID_REACTIONS as string[]).includes(value);
 }
 
+/**
+ * Helper: detect "table does not exist" errors thrown by D1 so we can
+ * return a clean 500 with a helpful message instead of letting it bubble
+ * up as a generic 500 (which the browser would then mask as a CORS
+ * error).
+ *
+ * This matters because the `post_reaction_log` table was added in a
+ * later migration — deployments that haven't re-run `npm run d1:migrate`
+ * will hit this on every post-reaction request.
+ */
+function isMissingTableError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    msg.includes('no such table') ||
+    msg.includes('no such column') ||
+    msg.includes('post_reaction_log')
+  );
+}
+
 export async function handleCreateVote(request: Request, env: Env): Promise<Response> {
+  const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
+  const origin = getOrigin(request);
+
   try {
     let body: any;
     try {
       body = await request.json();
     } catch {
-      return errorResponse('Invalid JSON body', 400);
+      return corsErrorResponse('Invalid JSON body', 400, allowedOrigins, origin);
     }
 
     const { comment_id, reaction_type } = body || {};
 
     if (!comment_id || typeof comment_id !== 'number') {
-      return errorResponse('Missing or invalid comment_id', 400);
+      return corsErrorResponse('Missing or invalid comment_id', 400, allowedOrigins, origin);
     }
     if (!isReactionType(reaction_type)) {
-      return errorResponse('Invalid reaction type', 400);
+      return corsErrorResponse('Invalid reaction type', 400, allowedOrigins, origin);
     }
 
     const ip = getClientIp(request);
@@ -55,43 +78,23 @@ export async function handleCreateVote(request: Request, env: Env): Promise<Resp
         'Rate limit exceeded. Please wait before voting again.',
         429
       );
-      response.headers.set('Retry-After', String(rateLimit.resetAt - Date.now()));
-      return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
+      response.headers.set('Retry-After', String(Math.max(1, rateLimit.resetAt - Date.now())));
+      return setCORSHeaders(response, allowedOrigins, origin);
     }
 
     // Only allow voting on APPROVED comments. Voting on pending/spam
     // comments would leak moderation state to the public.
     const comment = await db.getPublicCommentById(comment_id);
     if (!comment) {
-      return errorResponse('Comment not found', 404);
+      return corsErrorResponse('Comment not found', 404, allowedOrigins, origin);
     }
 
-    // BUG FIXED: the previous implementation called `getUserVote`
-    // (singular) which returned only the FIRST reaction the user had
-    // cast on the comment. The schema's UNIQUE constraint is on
-    // (comment_id, ip_address, reaction_type) — i.e. a user may cast
-    // ONE of EACH reaction type on a comment. The toggle logic was
-    // therefore broken:
-    //
-    //   - User votes "heart"  -> existingVote=null, creates "heart"     ✓
-    //   - User votes "thumbs_up" -> existingVote="heart", removes
-    //     "heart" and creates "thumbs_up" — but the user wanted BOTH ✗
-    //
-    // We now look up the full set of reactions the user has cast on
-    // the comment and toggle the requested one independently.
     const userReactions = await db.getUserVotes(comment_id, ip);
     const alreadyHas = userReactions.includes(reaction_type);
 
     if (alreadyHas) {
-      // Toggle off
       await db.removeVote(comment_id, ip, reaction_type);
-      // BUG FIXED: the previous implementation called `rateLimiter.logVote`
-      // here, which means toggling a vote OFF consumed the user's vote
-      // rate-limit budget. A user who clicked reactions on/off would
-      // quickly hit the 20/hour limit and be unable to vote at all. We
-      // now only log NEW votes.
     } else {
-      // Create new vote
       await db.createVote({ comment_id, ip_address: ip, reaction_type });
       await rateLimiter.logVote(ip);
     }
@@ -102,78 +105,88 @@ export async function handleCreateVote(request: Request, env: Env): Promise<Resp
       voted: !alreadyHas,
       reaction_type: alreadyHas ? null : reaction_type,
     });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
+    return setCORSHeaders(response, allowedOrigins, origin);
   } catch (error) {
     console.error('Error creating vote:', error);
-    return errorResponse('Failed to create vote', 500);
+    return corsErrorResponse('Failed to create vote', 500, allowedOrigins, origin);
   }
 }
 
 export async function handleGetCommentReactions(request: Request, env: Env): Promise<Response> {
+  const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
+  const origin = getOrigin(request);
   try {
     const url = new URL(request.url);
     const commentId = parseInt(url.searchParams.get('comment_id') || '', 10);
 
     if (!commentId || isNaN(commentId) || commentId <= 0) {
-      return errorResponse('Invalid comment ID', 400);
+      return corsErrorResponse('Invalid comment ID', 400, allowedOrigins, origin);
     }
 
     const db = new Database(env.DB);
     const reactions = await db.getCommentReactions(commentId);
 
     const response = jsonResponse({ reactions });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
+    return setCORSHeaders(response, allowedOrigins, origin);
   } catch (error) {
     console.error('Error fetching reactions:', error);
-    return errorResponse('Failed to fetch reactions', 500);
+    return corsErrorResponse('Failed to fetch reactions', 500, allowedOrigins, origin);
   }
 }
 
 export async function handleCreatePostReaction(request: Request, env: Env): Promise<Response> {
+  const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
+  const origin = getOrigin(request);
+
   try {
     let body: any;
     try {
       body = await request.json();
     } catch {
-      return errorResponse('Invalid JSON body', 400);
+      return corsErrorResponse('Invalid JSON body', 400, allowedOrigins, origin);
     }
 
     const { page_url, reaction_type } = body || {};
 
     if (!page_url || typeof page_url !== 'string') {
-      return errorResponse('Missing page_url', 400);
+      return corsErrorResponse('Missing page_url', 400, allowedOrigins, origin);
     }
     if (!isReactionType(reaction_type)) {
-      return errorResponse('Invalid reaction type', 400);
+      return corsErrorResponse('Invalid reaction type', 400, allowedOrigins, origin);
     }
 
     const ip = getClientIp(request);
     const db = new Database(env.DB);
     const rateLimiter = new RateLimiter(db);
 
-    // Rate limiting
-    const rateLimit = await rateLimiter.checkPostReactionLimit(ip);
-    if (!rateLimit.allowed) {
+    // Rate limiting — wrapped in try/catch because the dedicated
+    // post_reaction_log table may not exist on deployments that haven't
+    // re-run the migration. We fall back to "allow" rather than failing
+    // the request — rate-limiting is a soft protection, not a correctness
+    // requirement, and the user should still be able to react.
+    let rateLimitOk = true;
+    try {
+      const rateLimit = await rateLimiter.checkPostReactionLimit(ip);
+      rateLimitOk = rateLimit.allowed;
+    } catch (e) {
+      if (isMissingTableError(e)) {
+        console.warn(
+          '[post-reaction] post_reaction_log table missing — rate limit skipped. Run `npm run d1:migrate` to enable it.'
+        );
+      } else {
+        throw e;
+      }
+    }
+
+    if (!rateLimitOk) {
       const response = errorResponse(
         'Rate limit exceeded. Please wait before reacting again.',
         429
       );
-      response.headers.set('Retry-After', String(rateLimit.resetAt - Date.now()));
-      return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
+      response.headers.set('Retry-After', '900');
+      return setCORSHeaders(response, allowedOrigins, origin);
     }
 
-    // BUG FIXED: the previous implementation detected a duplicate
-    // (toggle-off) by catching a UNIQUE-constraint error and string-
-    // matching on `'UNIQUE'` in the error message. That is fragile:
-    //   - D1 error messages are not contractually stable across versions
-    //   - any OTHER constraint violation would be silently swallowed
-    //   - the rate-limit counter (`logVote`) was incorrectly incremented
-    //     inside the try block even on the toggle-OFF path
-    //
-    // We now SELECT first to detect existing reactions and decide
-    // between INSERT and DELETE explicitly. This is one extra round
-    // trip but is correct, readable, and avoids relying on error
-    // messages for control flow.
     const existing = await db.getPostReaction(page_url, ip, reaction_type);
 
     if (existing) {
@@ -181,41 +194,51 @@ export async function handleCreatePostReaction(request: Request, env: Env): Prom
       await db.removePostReaction(page_url, ip, reaction_type);
       const reactions = await db.getPostReactions(page_url);
       const response = jsonResponse({ reactions, reacted: false });
-      return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
+      return setCORSHeaders(response, allowedOrigins, origin);
     }
 
     // Create new reaction
     await db.createPostReaction({ page_url, ip_address: ip, reaction_type });
-    // BUG FIXED: previously called `rateLimiter.logVote(ip)`, which
-    // mixed post-reaction events into the vote_log counter. We now
-    // log to the dedicated post_reaction_log table.
-    await rateLimiter.logPostReaction(ip);
+
+    // Log the rate-limit event — same try/catch as above
+    try {
+      await rateLimiter.logPostReaction(ip);
+    } catch (e) {
+      if (!isMissingTableError(e)) {
+        console.warn('[post-reaction] failed to log rate-limit event:', e);
+      }
+    }
 
     const reactions = await db.getPostReactions(page_url);
     const response = jsonResponse({ reactions, reacted: true, reaction_type });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
+    return setCORSHeaders(response, allowedOrigins, origin);
   } catch (error) {
     console.error('Error creating post reaction:', error);
-    return errorResponse('Failed to create post reaction', 500);
+    const msg = isMissingTableError(error)
+      ? 'Database migration required: run `npm run d1:migrate` to add the post_reaction_log table.'
+      : 'Failed to create post reaction';
+    return corsErrorResponse(msg, 500, allowedOrigins, origin);
   }
 }
 
 export async function handleGetPostReactions(request: Request, env: Env): Promise<Response> {
+  const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
+  const origin = getOrigin(request);
   try {
     const url = new URL(request.url);
     const pageUrl = url.searchParams.get('page_url');
 
     if (!pageUrl) {
-      return errorResponse('page_url parameter is required', 400);
+      return corsErrorResponse('page_url parameter is required', 400, allowedOrigins, origin);
     }
 
     const db = new Database(env.DB);
     const reactions = await db.getPostReactions(pageUrl);
 
     const response = jsonResponse({ reactions });
-    return setCORSHeaders(response, parseAllowedOrigins(env.ALLOWED_ORIGINS), getOrigin(request));
+    return setCORSHeaders(response, allowedOrigins, origin);
   } catch (error) {
     console.error('Error fetching post reactions:', error);
-    return errorResponse('Failed to fetch post reactions', 500);
+    return corsErrorResponse('Failed to fetch post reactions', 500, allowedOrigins, origin);
   }
 }

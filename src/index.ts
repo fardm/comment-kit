@@ -392,6 +392,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
       <div class="nav-tabs">
         <button class="nav-tab active" data-tab="comments">Comments</button>
         <button class="nav-tab" data-tab="analytics">Analytics</button>
+        <button class="nav-tab" data-tab="reactions">Reactions</button>
         <button class="nav-tab" data-tab="settings">Settings</button>
         <button class="nav-tab" data-tab="import-export">Import/Export</button>
       </div>
@@ -448,6 +449,34 @@ const ADMIN_HTML = `<!DOCTYPE html>
         <h2>Comments by Page</h2>
         <div id="commentsByPage" class="comments-table">
           <div class="loading">Loading analytics...</div>
+        </div>
+      </div>
+
+      <!-- Reactions Tab -->
+      <div id="reactionsTab" class="tab-content">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>Comment Reactions</h3>
+            <div class="value" id="totalCommentReactions">0</div>
+          </div>
+          <div class="stat-card">
+            <h3>Post Reactions</h3>
+            <div class="value" id="totalPostReactions">0</div>
+          </div>
+          <div class="stat-card">
+            <h3>Pages with Post Reactions</h3>
+            <div class="value" id="uniquePagesWithReactions">0</div>
+          </div>
+        </div>
+
+        <h2>Comment Reactions</h2>
+        <div id="commentReactionsTable" class="comments-table">
+          <div class="loading">Loading reactions...</div>
+        </div>
+
+        <h2 style="margin-top: 2rem;">Post Reactions</h2>
+        <div id="postReactionsTable" class="comments-table">
+          <div class="loading">Loading reactions...</div>
         </div>
       </div>
 
@@ -572,6 +601,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
         
         if (tab.dataset.tab === 'comments') loadComments();
         if (tab.dataset.tab === 'analytics') loadAnalytics();
+        if (tab.dataset.tab === 'reactions') loadReactions();
         if (tab.dataset.tab === 'settings') loadSettings();
       });
     });
@@ -902,6 +932,130 @@ const ADMIN_HTML = `<!DOCTYPE html>
       }
     }
 
+    async function loadReactions() {
+      try {
+        const response = await fetch(\`\${API_BASE}/reactions?limit=200\`, {
+          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        });
+        if (!response.ok) {
+          throw new Error('Failed to load reactions');
+        }
+        const data = await response.json();
+
+        // Stat cards
+        document.getElementById('totalCommentReactions').textContent = data.stats?.total_comment_reactions || 0;
+        document.getElementById('totalPostReactions').textContent = data.stats?.total_post_reactions || 0;
+        document.getElementById('uniquePagesWithReactions').textContent = data.stats?.unique_pages_with_post_reactions || 0;
+
+        // Comment reactions table
+        const commentReactions = data.comment_reactions || [];
+        const crTable = document.getElementById('commentReactionsTable');
+        if (commentReactions.length === 0) {
+          crTable.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No comment reactions yet.</div>';
+        } else {
+          crTable.innerHTML = \`
+            <table>
+              <thead>
+                <tr>
+                  <th>Comment ID</th>
+                  <th>Author</th>
+                  <th>Page</th>
+                  <th>Reaction</th>
+                  <th>Count</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                \${commentReactions.map(r => \`
+                  <tr>
+                    <td>\${r.comment_id}</td>
+                    <td>\${escapeHtml(r.author_name || '')}</td>
+                    <td class="comment-content">\${escapeHtml(r.page_url || '')}</td>
+                    <td><span class="status-badge status-approved">\${escapeHtml(r.reaction_type)}</span></td>
+                    <td>\${r.count}</td>
+                    <td class="actions">
+                      <button class="btn btn-danger" onclick="deleteCommentReaction(\${r.comment_id}, '\${escapeHtml(r.reaction_type)}')">Delete</button>
+                    </td>
+                  </tr>
+                \`).join('')}
+              </tbody>
+            </table>
+          \`;
+        }
+
+        // Post reactions table
+        const postReactions = data.post_reactions || [];
+        const prTable = document.getElementById('postReactionsTable');
+        if (postReactions.length === 0) {
+          prTable.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No post reactions yet.</div>';
+        } else {
+          prTable.innerHTML = \`
+            <table>
+              <thead>
+                <tr>
+                  <th>Page</th>
+                  <th>Reaction</th>
+                  <th>Count</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                \${postReactions.map(r => \`
+                  <tr>
+                    <td class="comment-content">\${escapeHtml(r.page_url || '')}</td>
+                    <td><span class="status-badge status-approved">\${escapeHtml(r.reaction_type)}</span></td>
+                    <td>\${r.count}</td>
+                    <td class="actions">
+                      <button class="btn btn-danger" onclick="deletePostReaction('\${escapeHtml(r.page_url)}', '\${escapeHtml(r.reaction_type)}')">Delete</button>
+                    </td>
+                  </tr>
+                \`).join('')}
+              </tbody>
+            </table>
+          \`;
+        }
+      } catch (error) {
+        console.error('Failed to load reactions:', error);
+      }
+    }
+
+    async function deleteCommentReaction(commentId, reactionType) {
+      if (!confirm(\`Delete all '\${reactionType}' reactions on comment #\${commentId}?\`)) return;
+      try {
+        const response = await fetch(\`\${API_BASE}/reactions/comment?id=\${commentId}&reaction_type=\${encodeURIComponent(reactionType)}\`, {
+          method: 'DELETE',
+          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        });
+        if (response.ok) {
+          loadReactions();
+        } else {
+          alert('Failed to delete reaction');
+        }
+      } catch (e) {
+        alert('Network error');
+      }
+    }
+
+    async function deletePostReaction(pageUrl, reactionType) {
+      if (!confirm(\`Delete all '\${reactionType}' reactions on page '\${pageUrl}'?\`)) return;
+      try {
+        const response = await fetch(\`\${API_BASE}/reactions/post?page_url=\${encodeURIComponent(pageUrl)}&reaction_type=\${encodeURIComponent(reactionType)}\`, {
+          method: 'DELETE',
+          headers: { 'Authorization': \`Bearer \${authToken}\` }
+        });
+        if (response.ok) {
+          loadReactions();
+        } else {
+          alert('Failed to delete reaction');
+        }
+      } catch (e) {
+        alert('Network error');
+      }
+    }
+    // Expose for inline onclick handlers
+    window.deleteCommentReaction = deleteCommentReaction;
+    window.deletePostReaction = deletePostReaction;
+
     async function loadSettings() {
       try {
         const response = await fetch(\`\${API_BASE}/settings\`, {
@@ -1027,6 +1181,15 @@ export default {
       }
       if (path === '/api/admin/analytics' && request.method === 'GET') {
         return adminHandlers.handleGetAnalytics(request, env);
+      }
+      if (path === '/api/admin/reactions' && request.method === 'GET') {
+        return adminHandlers.handleGetReactions(request, env);
+      }
+      if (path === '/api/admin/reactions/comment' && request.method === 'DELETE') {
+        return adminHandlers.handleDeleteCommentReaction(request, env);
+      }
+      if (path === '/api/admin/reactions/post' && request.method === 'DELETE') {
+        return adminHandlers.handleDeletePostReaction(request, env);
       }
       if (path === '/api/admin/settings' && request.method === 'GET') {
         return adminHandlers.handleGetSettings(request, env);
