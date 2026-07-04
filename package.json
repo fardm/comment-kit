@@ -1,0 +1,32 @@
+{
+  "name": "standalone-comments-server",
+  "version": "2.0.0",
+  "description": "Serverless comments system using Cloudflare Workers and D1",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "d1:create": "wrangler d1 create comments-db",
+    "d1:migrate": "wrangler d1 execute comments-db --file=./migrations/schema.sql",
+    "d1:migrate-local": "wrangler d1 execute comments-db --local --file=./migrations/schema.sql",
+    "d1:backup": "wrangler d1 export comments-db --output=./backups/db-$(date +%Y%m%d-%H%M%S).sql",
+    "d1:backup-local": "wrangler d1 export comments-db --local --output=./backups/db-local-$(date +%Y%m%d-%H%M%S).sql",
+    "test": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "comments",
+    "cloudflare-workers",
+    "d1",
+    "serverless"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.94.0"
+  },
+  "dependencies": {}
+}

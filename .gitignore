@@ -1,3 +1,14 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+.wrangler/
+.dev.vars
+
 # Protect database directory (except template)
 db/*
 !db/
@@ -10,6 +21,14 @@ backups/
 logs/
 *.log
 
+# Environment files
+.env
+.env.local
+.env.*.local
+
 # Local development files
 .DS_Store
 dev.marker
+
+# TypeScript
+*.tsbuildinfo

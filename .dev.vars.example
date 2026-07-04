@@ -1,0 +1,13 @@
+# Environment Variables Example
+# Copy this file to .dev.vars and fill in your values
+
+# App Configuration
+APP_URL=https://example.com/comments
+ALLOWED_ORIGINS=https://example.com
+APP_LANGUAGE=en
+SESSION_LIFETIME=2592000
+
+# Secrets (set via: wrangler secret put <SECRET_NAME>)
+# ADMIN_PASSWORD_HASH=your-password-hash-here
+# JWT_SECRET=your-jwt-secret-here
+# EMAIL_API_KEY=your-email-service-api-key

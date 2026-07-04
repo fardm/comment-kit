@@ -1,160 +1,417 @@
-English | [فارسی](https://github.com/fardm/standalone-comments-server/blob/main/README-fa.md)
+# Standalone Comments Server - Cloudflare Workers + D1
 
-# Quartz Standalone Comments
-
-This project adds a commenting system to [Quartz](https://quartz.jzhao.xyz/). The original repository can be found here: https://github.com/dlnorman/standalone-comments.
-
- I made several modifications to improve compatibility and usability for Quartz websites.
-
- > ✅ Compatible with Quartz v5
+A fully-featured, serverless comments system built with Cloudflare Workers, TypeScript, and Cloudflare D1 (SQLite). This is a complete refactor of the original PHP-based system, offering better performance, scalability, and zero infrastructure maintenance.
 
 ## Features
 
-![image](comments.webp)
+### Public Features
+- ✅ **Create comments** with author name, email, and optional website URL
+- ✅ **Fetch comments by page** with pagination support
+- ✅ **Threaded replies** (nested comments with unlimited depth)
+- ✅ **Emoji reactions** (heart, thumbs up/down, laugh, cry, fire, clap)
+- ✅ **Post-level reactions** (react to pages without commenting)
+- ✅ **Email subscriptions** (subscribe to comment notifications per page)
+- ✅ **Automatic spam detection** with keyword and pattern filtering
 
-- 🌍 Multilingual support (English & Persian, extendable via i18n)
-- 😀 Reactions with 10 emoji options for both posts and comments
-- 👤 Gravatar integration with automatic fallback avatars
-- 💬 Latest comments widget
-- 🛠️ Admin panel for viewing and managing comments
-- 📦 Data import and export support
-- 🛡️ Spam protection and moderation system
-- 📧 Email notifications for new comments
+### Admin Panel
+- ✅ **Authentication** with secure session management
+- ✅ **Comment moderation** (approve, reject, mark as spam)
+- ✅ **Bulk actions** (approve/reject/delete multiple comments)
+- ✅ **View all comments** with filters (pending, approved, spam)
+- ✅ **Analytics dashboard** with engagement metrics
+- ✅ **Settings management** (moderation, limits, notifications)
+- ✅ **Import/Export** comments in JSON format
 
-<br>
+### Security
+- ✅ **Rate limiting** (comments, votes, reactions)
+- ✅ **Spam protection** (keyword detection, link limits, caps ratio)
+- ✅ **Brute force protection** (login attempt limiting)
+- ✅ **Session management** with automatic expiration
+- ✅ **CORS support** for cross-origin requests
+
+### Architecture
+- ✅ **Fully serverless** - no servers to manage
+- ✅ **Cloudflare D1** - SQLite database at the edge
+- ✅ **TypeScript** - type-safe codebase
+- ✅ **Modular structure** - separated handlers and utilities
+- ✅ **RESTful API** - clean, predictable endpoints
 
 ## Installation
 
-> ⚠️ It is recommended to use PHP 8.0 or newer. Although the original project claims support for PHP 7.4, I encountered errors with PHP 8.1. The issues were resolved after upgrading to PHP 8.3.
+### Prerequisites
 
-### Step 1: Install on Your Server
+- Node.js 18+ 
+- npm or yarn
+- Cloudflare account with Workers and D1 enabled
+- Wrangler CLI (`npm install -g wrangler`)
 
-1. Get a shared hosting account and create a subdomain, for example: `comments.yourdomain.com`.
-2. Download this repository by clicking the green **Code** button and selecting **Download ZIP**.
-3. Upload the ZIP file to your hosting account's `public_html` directory and extract it.
-4. Edit the `config.php` file:
-   - Set `APP_URL` to the subdomain where you uploaded the files, for example: `https://comments.yourdomain.com`  
-   - Set `ALLOWED_ORIGINS` to your Quartz website domain, for example: `https://yourdomain.com`  
-   - Set `APP_LANGUAGE` to choose the frontend language (`en` or `fa`)
-5. Open `set-password.php` in your browser:
-
-   ```
-   https://comments.yourdomain.com/set-password.php
-   ```
-
-6. Choose an admin password.
-7. Open the admin panel:
-
-   ```
-   https://comments.yourdomain.com/admin.html
-   ```
-
-8. Enter the password you selected and log in.
-
-After successfully logging in, delete the `set-password.php` file from your `public_html` directory.
-
-### Step 2: Install the Quartz Plugin
-
-Run the following command inside your Quartz project:
+### Step 1: Install Dependencies
 
 ```bash
-npx quartz plugin add github:fardm/quartz-standalone-comments
+npm install
 ```
 
-Once installed, open the `quartz.config.yaml` file and configure the plugin. Set `backendUrl` to the URL of the server where you uploaded the comment system:
+### Step 2: Configure Wrangler
 
-```yaml
-- source: github:fardm/quartz-standalone-comments
-  enabled: true
-  options:
-    backendUrl: https://comments.yourdomain.com
-  layout:
-    position: afterBody
-    priority: 100
+Edit `wrangler.toml` and update the following:
+
+```toml
+name = "standalone-comments-server"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "comments-db"
+database_id = "your-database-id"  # Replace after creation
+
+[vars]
+APP_URL = "https://comments.yourdomain.com"
+ALLOWED_ORIGINS = "https://yourdomain.com"
+APP_LANGUAGE = "en"
+SESSION_LIFETIME = "2592000"
 ```
 
-Start the local preview server:
+### Step 3: Create D1 Database
 
 ```bash
-npx quartz build --serve
+# Create the database
+wrangler d1 create comments-db
+
+# Copy the database ID from the output and update wrangler.toml
 ```
 
-You should now see the comment section at the bottom of your pages.
-
-Keep in mind that this is only a local preview. Since the site is running locally, reactions and comments will not be stored in the database.
-
-Deploy and sync your site using:
+### Step 4: Run Database Migration
 
 ```bash
-npx quartz sync
+# For local development
+npm run d1:migrate-local
+
+# For production
+npm run d1:migrate
 ```
 
-After deployment, visit your website and test both comments and reactions.
+### Step 5: Set Secrets
 
-<br>
+```bash
+# Set admin password hash (generate using a SHA-256 tool)
+wrangler secret put ADMIN_PASSWORD_HASH
 
-## Recent Comments Widget
+# Set JWT secret (use a random 32+ character string)
+wrangler secret put JWT_SECRET
 
-To display the latest comments in your sidebar or any other part of your site's layout, simply add the following configuration to your `quartz.config.yaml` file:
-
-```yaml
-- source: github:fardm/quartz-standalone-comments
-  enabled: true
-  options:
-    backendUrl: [https://comments.yourdomain.com](https://comments.yourdomain.com)
-    type: recent
-    limit: 5
-  layout:
-    position: right
-    priority: 50
+# Optional: Set email API key for notifications
+wrangler secret put EMAIL_API_KEY
 ```
 
-<br>
+### Step 6: Deploy
 
-## Enable Email Notifications
-
-Email notifications require a cron job. If you installed the system on a subdomain (recommended), use the correct absolute path from your hosting provider.
-
-1. Create a new Cron Job in your hosting panel  
-2. Paste the following command:
+```bash
+# Deploy to Cloudflare Workers
+npm run deploy
 ```
-/usr/local/bin/php /home/username/domains/comments.example.com/public_html/utils/process-email-queue.php
+
+### Step 7: Access Admin Panel
+
+1. Visit `https://your-worker-url/admin`
+2. Login with the password you set
+3. Configure settings in the admin panel
+
+## API Endpoints
+
+### Public API
+
+#### Get Comments
 ```
-3. Go to **Utilities** and enable **Email Notifications**  
-4. Enter your email address in the **Admin Email** field and save the settings  
-5. Create a few test comments to verify everything is working correctly
+GET /api/comments?page_url={url}&status={pending|approved|spam}&sort={asc|desc}
+```
 
-<br>
+#### Create Comment
+```
+POST /api/comments
+Content-Type: application/json
 
-## My Modifications
+{
+  "page_url": "https://example.com/page",
+  "parent_id": null,
+  "author_name": "John Doe",
+  "author_email": "john@example.com",
+  "author_url": "https://example.com",
+  "content": "Great article!"
+}
+```
 
-Summary of the changes I made to the original project:
+#### Vote on Comment
+```
+POST /api/vote
+Content-Type: application/json
 
-- Added language configuration support for the frontend (i18n-ready setup).
-- Jalali (Persian) date support
-- Added comment sorting controls in the admin panel.
-- Refactored import/export system to include all data types (comments, reactions, subscriptions, and spam).
-- Added a one-click database cleanup feature with selectable data categories.
-- Improved styling and UI
-- Dark mode for the admin panel
-- Redesigned emoji reactions (the original version only included four Disqus-style reactions; this version provides a wider GitHub-style emoji selection)
-- Formatting help displayed inside the comment editor
-- Added Gravatar support with automatic fallback avatars.
+{
+  "comment_id": 123,
+  "reaction_type": "heart"
+}
+```
 
-<br>
+#### React to Post
+```
+POST /api/post-reaction
+Content-Type: application/json
 
-## Security
+{
+  "page_url": "https://example.com/page",
+  "reaction_type": "heart"
+}
+```
 
-To reduce spam and abuse, the system includes several protection layers:
+#### Subscribe to Page
+```
+POST /api/subscribe
+Content-Type: application/json
 
-- Honeypot protection to detect and block bots
-- Rate limiting
-- Automatic IP blocking after multiple failed login attempts in the admin panel
+{
+  "page_url": "https://example.com/page",
+  "email": "user@example.com"
+}
+```
 
-<br>
+#### Unsubscribe
+```
+GET /api/unsubscribe?token={token}
+```
 
-## Future Improvements
+### Admin API
 
-- [ ] Refactor `api.php` into smaller modules (comments, reactions, subscriptions, settings, import/export) to improve maintainability.
-- [ ] Create a shared admin layout/navigation component to remove duplicated HTML across admin pages.
-- [ ] Reorganize `utils/` into structured subfolders (imports, migrations, maintenance) for better clarity.
+All admin endpoints require authentication via Bearer token or cookie.
+
+#### Login
+```
+POST /api/admin/login
+Content-Type: application/json
+
+{
+  "password": "your-password"
+}
+```
+
+#### Get All Comments
+```
+GET /api/admin/comments?status={pending|approved|spam}&page_url={url}&limit=50&offset=0
+Authorization: Bearer {token}
+```
+
+#### Update Comment
+```
+PUT /api/admin/comment?id={id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "status": "approved",
+  "content": "Updated content"
+}
+```
+
+#### Delete Comment
+```
+DELETE /api/admin/comment?id={id}
+Authorization: Bearer {token}
+```
+
+#### Bulk Update
+```
+POST /api/admin/comments/bulk
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "ids": [1, 2, 3],
+  "action": "approve"  // approve, reject, spam, delete
+}
+```
+
+#### Get Analytics
+```
+GET /api/admin/analytics
+Authorization: Bearer {token}
+```
+
+#### Get Settings
+```
+GET /api/admin/settings
+Authorization: Bearer {token}
+```
+
+#### Update Settings
+```
+PUT /api/admin/settings
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "require_moderation": true,
+  "allow_guest_comments": true,
+  "max_comment_length": 5000,
+  "comment_sort_order": "asc",
+  "admin_email": "admin@example.com"
+}
+```
+
+#### Export Comments
+```
+GET /api/admin/export
+Authorization: Bearer {token}
+```
+
+#### Import Comments
+```
+POST /api/admin/import
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "comments": [...],
+  "settings": {...}
+}
+```
+
+## Database Schema
+
+The system uses Cloudflare D1 (SQLite) with the following tables:
+
+- **comments** - Stores all comments with threading support
+- **votes** - Stores emoji reactions on comments
+- **post_reactions** - Stores page-level emoji reactions
+- **subscriptions** - Stores email subscriptions per page
+- **email_queue** - Queue for asynchronous email delivery
+- **sessions** - Admin session management
+- **login_attempts** - Brute force protection tracking
+- **vote_log** - Rate limiting for votes
+- **settings** - System configuration
+
+See `migrations/schema.sql` for the complete schema.
+
+## Development
+
+### Local Development
+
+```bash
+# Start local development server
+npm run dev
+
+# Run with local D1 database
+wrangler dev --local
+```
+
+### Type Checking
+
+```bash
+npm run type-check
+```
+
+### Testing
+
+```bash
+npm run test
+```
+
+## Email Notifications
+
+The system includes an email queue for asynchronous notifications. To enable email delivery:
+
+1. Set `EMAIL_API_KEY` secret with your email service API key
+2. Enable notifications in admin settings
+3. Configure admin email address
+4. Set up a Cloudflare Cron Trigger to process the queue (coming soon)
+
+Supported email providers (via API integration):
+- Resend
+- SendGrid
+- Mailgun
+- AWS SES
+- Cloudflare Email Routing
+
+## Migration from PHP Version
+
+If you're migrating from the original PHP version:
+
+1. Export your existing data using the PHP admin panel
+2. Import the JSON file using the new admin panel
+3. Update your frontend to use the new API endpoints
+4. Deploy the Cloudflare Worker
+5. Update DNS to point to the Worker
+
+## Configuration
+
+### Environment Variables
+
+Set in `wrangler.toml` or as secrets:
+
+- `APP_URL` - Base URL of the comment system
+- `ALLOWED_ORIGINS` - Comma-separated list of allowed CORS origins
+- `APP_LANGUAGE` - Default language (en, fa, etc.)
+- `SESSION_LIFETIME` - Session lifetime in seconds (default: 2592000)
+- `ADMIN_PASSWORD_HASH` - SHA-256 hash of admin password (secret)
+- `JWT_SECRET` - Secret for session tokens (secret)
+- `EMAIL_API_KEY` - Email service API key (secret, optional)
+
+### Rate Limits
+
+Default rate limits (configurable in code):
+
+- Comments: 5 per hour per IP
+- Votes: 20 per hour per IP
+- Post reactions: 10 per hour per IP
+- Login attempts: 5 failed attempts per 15 minutes
+
+## Security Considerations
+
+- Always use HTTPS in production
+- Set strong admin passwords
+- Keep secrets secure (never commit to git)
+- Enable moderation for public-facing sites
+- Monitor the admin panel for spam
+- Regularly backup your D1 database
+
+## Backup and Restore
+
+### Backup
+
+```bash
+# Production backup
+npm run d1:backup
+
+# Local backup
+npm run d1:backup-local
+```
+
+### Restore
+
+```bash
+# Restore from SQL file
+wrangler d1 execute comments-db --file=backup.sql
+```
+
+## Performance
+
+Cloudflare Workers + D1 provides:
+
+- **Global edge deployment** - Low latency worldwide
+- **Automatic scaling** - No capacity planning needed
+- **Zero cold starts** - Fast response times
+- **Built-in caching** - D1 includes query caching
+- **DDoS protection** - Cloudflare's edge security
+
+## License
+
+MIT
+
+## Support
+
+For issues and questions:
+- Open an issue on GitHub
+- Check the documentation
+- Review the API endpoints above
+
+## Acknowledgments
+
+This is a complete refactor of the original PHP-based standalone-comments-server, adapted for Cloudflare's serverless platform while maintaining feature parity and adding modern improvements.
