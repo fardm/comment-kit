@@ -130,6 +130,21 @@ CREATE TABLE IF NOT EXISTS vote_log (
 
 CREATE INDEX IF NOT EXISTS idx_vote_log_ip ON vote_log(ip_address, created_at);
 
+-- Post-reaction log for rate limiting
+-- BUG FIXED: previously, post-reaction events were logged into the
+-- `vote_log` table (which is dedicated to COMMENT votes). That meant
+-- the per-IP limits for votes (20/hour) and post-reactions (10/hour)
+-- shared a single counter, so a user who cast 20 votes would be
+-- blocked from reacting to any posts (and vice versa). The dedicated
+-- `post_reaction_log` table keeps the two limits independent.
+CREATE TABLE IF NOT EXISTS post_reaction_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip_address TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_post_reaction_log_ip ON post_reaction_log(ip_address, created_at);
+
 -- Post reactions table for page-level emoji reactions (no comment required)
 CREATE TABLE IF NOT EXISTS post_reactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

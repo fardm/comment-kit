@@ -5,6 +5,9 @@ import * as commentHandlers from './handlers/comments';
 import * as reactionHandlers from './handlers/reactions';
 import * as subscriptionHandlers from './handlers/subscriptions';
 import * as adminHandlers from './handlers/admin';
+import { EmailService } from './handlers/email';
+import { Database } from './lib/db';
+import { jsonResponse, parseAllowedOrigins, setCORSHeaders } from './lib/utils';
 
 // Admin panel HTML (inlined to avoid database escaping issues)
 const ADMIN_HTML = `<!DOCTYPE html>
@@ -930,23 +933,38 @@ const ADMIN_HTML = `<!DOCTYPE html>
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+    let url: URL;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return new Response('Bad Request', { status: 400 });
+    }
     const path = url.pathname;
+    const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
+    const origin = request.headers.get('Origin');
 
-    // CORS preflight
+    /**
+     * Helper: attach CORS headers to a Response using the worker's
+     * configured allowed-origins list. We re-use this for the 404 /
+     * 405 fallthroughs so that browser-side fetch() callers get a
+     * proper CORS error (or success) instead of an opaque network
+     * error — which is what the previous implementation produced.
+     */
+    const withCors = (response: Response): Response =>
+      setCORSHeaders(response, allowedOrigins, origin);
+
+    // CORS preflight — handled early so we never reach business logic.
     if (request.method === 'OPTIONS') {
       return commentHandlers.handleOptions(request, env);
     }
 
-    // Public API routes
+    // ---- Public API routes ---------------------------------------------
     if (path === '/api/comments' && request.method === 'GET') {
       return commentHandlers.handleGetComments(request, env);
     }
-
     if (path === '/api/comments' && request.method === 'POST') {
       return commentHandlers.handleCreateComment(request, env);
     }
-
     if (path === '/api/comment' && request.method === 'GET') {
       return commentHandlers.handleGetComment(request, env);
     }
@@ -955,15 +973,12 @@ export default {
     if (path === '/api/vote' && request.method === 'POST') {
       return reactionHandlers.handleCreateVote(request, env);
     }
-
     if (path === '/api/vote' && request.method === 'GET') {
       return reactionHandlers.handleGetCommentReactions(request, env);
     }
-
     if (path === '/api/post-reaction' && request.method === 'POST') {
       return reactionHandlers.handleCreatePostReaction(request, env);
     }
-
     if (path === '/api/post-reaction' && request.method === 'GET') {
       return reactionHandlers.handleGetPostReactions(request, env);
     }
@@ -972,74 +987,118 @@ export default {
     if (path === '/api/subscribe' && request.method === 'POST') {
       return subscriptionHandlers.handleCreateSubscription(request, env);
     }
-
     if (path === '/api/unsubscribe' && request.method === 'GET') {
       return subscriptionHandlers.handleUnsubscribe(request, env);
     }
-
     if (path === '/api/subscriptions' && request.method === 'GET') {
       return subscriptionHandlers.handleGetSubscriptions(request, env);
     }
 
-    // Admin API routes
+    // ---- Health check ---------------------------------------------------
+    // Lightweight liveness probe used by uptime monitors. Does NOT
+    // touch the database — for a DB-aware readiness check, hit
+    // /api/comments?page_url=... instead.
+    if (path === '/api/health') {
+      return withCors(jsonResponse({ ok: true, time: new Date().toISOString() }));
+    }
+
+    // ---- Admin API routes ----------------------------------------------
     if (path.startsWith('/api/admin/')) {
       if (path === '/api/admin/login' && request.method === 'POST') {
         return adminHandlers.handleAdminLogin(request, env);
       }
-
       if (path === '/api/admin/logout' && request.method === 'POST') {
         return adminHandlers.handleAdminLogout(request, env);
       }
-
       if (path === '/api/admin/verify' && request.method === 'GET') {
         return adminHandlers.handleAdminVerify(request, env);
       }
-
       if (path === '/api/admin/comments' && request.method === 'GET') {
         return adminHandlers.handleGetAllComments(request, env);
       }
-
       if (path === '/api/admin/comment' && request.method === 'PUT') {
         return adminHandlers.handleUpdateComment(request, env);
       }
-
       if (path === '/api/admin/comment' && request.method === 'DELETE') {
         return adminHandlers.handleDeleteComment(request, env);
       }
-
       if (path === '/api/admin/comments/bulk' && request.method === 'POST') {
         return adminHandlers.handleBulkUpdateComments(request, env);
       }
-
       if (path === '/api/admin/analytics' && request.method === 'GET') {
         return adminHandlers.handleGetAnalytics(request, env);
       }
-
       if (path === '/api/admin/settings' && request.method === 'GET') {
         return adminHandlers.handleGetSettings(request, env);
       }
-
       if (path === '/api/admin/settings' && request.method === 'PUT') {
         return adminHandlers.handleUpdateSettings(request, env);
       }
-
       if (path === '/api/admin/export' && request.method === 'GET') {
         return adminHandlers.handleExportComments(request, env);
       }
-
       if (path === '/api/admin/import' && request.method === 'POST') {
         return adminHandlers.handleImportComments(request, env);
       }
+
+      // Unknown /api/admin/* path
+      return withCors(jsonResponse({ error: 'Not Found' }, 404));
     }
 
-    // Serve static files for admin panel
+    // ---- Admin panel (HTML) --------------------------------------------
     if (path === '/admin' || path === '/admin/') {
       return new Response(ADMIN_HTML, {
-        headers: { 'Content-Type': 'text/html' },
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'Referrer-Policy': 'no-referrer',
+        },
       });
     }
 
-    // 404 for unknown routes
-    return new Response('Not Found', { status: 404 });
+    // ---- Root / favicon -------------------------------------------------
+    if (path === '/' || path === '/index.html') {
+      return withCors(jsonResponse({ name: 'comment-kit', ok: true }));
+    }
+
+    // ---- 404 fallthrough ------------------------------------------------
+    // BUG FIXED: the previous 404 response had NO CORS headers, which
+    // made every miss from a browser-side fetch() look like a network
+    // error in JS. We now attach CORS so the caller can read the 404
+    // body cleanly.
+    return withCors(jsonResponse({ error: 'Not Found', path }, 404));
+  },
+
+  /**
+   * Cloudflare Workers `scheduled` event handler.
+   *
+   * Drives the email-queue processor on a cron schedule. The schedule
+   * is configured in wrangler.toml under `[triggers].crons`. Without
+   * this handler, the email_queue table fills up with `pending` rows
+   * that are never sent — the original implementation noted this as a
+   * "coming soon" feature in the README but never wired it up.
+   *
+   * We process at most 50 emails per invocation to stay well under
+   * the Workers CPU-time limit for scheduled events (30s on the free
+   * plan, 15min on paid). If the queue is longer than that, the next
+   * cron tick picks up the remainder.
+   */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const db = new Database(env.DB);
+    const emailService = new EmailService(env, db);
+
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const result = await emailService.processEmailQueue();
+          console.log(
+            `[scheduled] email queue: processed=${result.processed} failed=${result.failed}`
+          );
+        } catch (error) {
+          console.error('[scheduled] email queue processing failed:', error);
+        }
+      })()
+    );
   },
 };

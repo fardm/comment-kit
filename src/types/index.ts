@@ -144,7 +144,10 @@ export interface Env {
   APP_LANGUAGE: string;
   SESSION_LIFETIME: string;
   ADMIN_PASSWORD_HASH?: string;
-  JWT_SECRET?: string;
+  // NOTE: JWT_SECRET has been intentionally removed. The previous code
+  // read it but never used it for any actual JWT operation — the Auth
+  // class generates opaque random session tokens instead. Keeping the
+  // field in the type would imply it's required when it isn't.
   EMAIL_API_KEY?: string;
 }
 

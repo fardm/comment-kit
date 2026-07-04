@@ -17,8 +17,21 @@ SESSION_LIFETIME = "2592000"  # 30 days in seconds
 
 # Secrets (set via: wrangler secret put <SECRET_NAME>)
 # - ADMIN_PASSWORD_HASH
-# - JWT_SECRET
 # - EMAIL_API_KEY (optional, for email notifications)
+#
+# NOTE: the JWT_SECRET variable from the PHP version is no longer
+# required — the Workers port uses opaque random session tokens, not
+# JWTs, and the Auth class no longer reads env.JWT_SECRET.
+
+# Cron triggers — drives the email-queue processor. Runs every 5
+# minutes (the minimum interval allowed by Cloudflare Workers Cron
+# Triggers). Without this, the email_queue table accumulates `pending`
+# rows that are never sent.
+#
+# To disable email notifications entirely, comment out the line below
+# AND set `enable_notifications = 'false'` in the admin settings panel.
+[triggers]
+crons = ["*/5 * * * *"]
 
 # KV Binding for rate limiting (optional, can use D1 instead)
 # [[kv_namespaces]]
